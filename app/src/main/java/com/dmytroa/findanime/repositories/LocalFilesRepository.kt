@@ -8,7 +8,7 @@ import com.dmytroa.findanime.dataClasses.Album
 
 object LocalFilesRepository {
 
-    const val TAG = "LocalFilesRepository"
+    private const val TAG = "LocalFilesRepository"
     @SuppressLint("InlinedApi") // ImageColumns.BUCKET_DISPLAY_NAME was available before api 29
     fun getAlbums(context: Context): ArrayList<Album> {
         val albums = arrayListOf<Album>()

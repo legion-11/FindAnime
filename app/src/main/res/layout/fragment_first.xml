@@ -7,14 +7,15 @@ android:layout_height="match_parent"
 tools:context=".fragments.FirstFragment">
 
 
-    <Button
-        android:id="@+id/button_first"
+    <ImageView
+        android:id="@+id/imageView"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/next"
-        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        tools:src="@tools:sample/avatars"
+        android:contentDescription="temporary image view for image selection" />
 
     <androidx.recyclerview.widget.RecyclerView
     android:id="@+id/searchResultRecyclerView"

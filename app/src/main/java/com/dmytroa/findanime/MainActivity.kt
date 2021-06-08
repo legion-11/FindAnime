@@ -2,6 +2,8 @@ package com.dmytroa.findanime
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.content.res.Configuration
+import android.net.Uri
 import android.os.Bundle
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import androidx.appcompat.app.AppCompatActivity
@@ -14,7 +16,7 @@ import androidx.fragment.app.FragmentManager
 import com.dmytroa.findanime.fragments.ImageDrawerListDialogFragment
 import com.google.android.material.snackbar.Snackbar
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageClickListener {
 
     private val FragmentManager.currentNavigationFragment: Fragment?
         get() = primaryNavigationFragment?.childFragmentManager?.fragments?.first()
@@ -33,9 +35,9 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             } else {
                 //TODO for now it always asks permission, change to getting from shared properties last answer
-                supportFragmentManager.currentNavigationFragment?.let { fragment ->
-                    ImageDrawerListDialogFragment.newInstance(fragment as ImageDrawerListDialogFragment.OnImageClickListener).show(supportFragmentManager, "dialog")
-                }
+                ImageDrawerListDialogFragment
+                    .newInstance()
+                    .show(supportFragmentManager, "dialog")
             }
         }
     }
@@ -64,11 +66,9 @@ class MainActivity : AppCompatActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQUEST_PERMISSION) {
             if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                supportFragmentManager.currentNavigationFragment?.let {fragment ->
-                    ImageDrawerListDialogFragment
-                        .newInstance(fragment as ImageDrawerListDialogFragment.OnImageClickListener)
-                        .show(supportFragmentManager, "dialog")
-                }
+                ImageDrawerListDialogFragment
+                    .newInstance()
+                    .show(supportFragmentManager, "dialog")
             } else {
                 Snackbar.make(fab, "You can always enable gallery in settings", Snackbar.LENGTH_LONG)
                     .setAction("Action", null).show()
@@ -76,7 +76,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+
     companion object {
         const val REQUEST_PERMISSION = 100
+    }
+
+    override fun onImageClick(imageUri: Uri) {
+        supportFragmentManager.currentNavigationFragment?.let {fragment ->
+            (fragment as ImageDrawerListDialogFragment.OnImageClickListener).onImageClick(imageUri)
+        }
     }
 }

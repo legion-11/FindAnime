@@ -2,8 +2,6 @@ package com.dmytroa.findanime.fragments
 
 import androidx.lifecycle.*
 import com.dmytroa.findanime.dataClasses.Album
-import java.util.*
-import kotlin.collections.ArrayList
 
 class ImageDrawerViewModel(private val albums: ArrayList<Album>,
                            allImagesStringLocalized: String) : ViewModel() {
@@ -24,7 +22,7 @@ class ImageDrawerViewModel(private val albums: ArrayList<Album>,
                 }
             }
         }
-        selectedImages.reversed() as ArrayList<Long>
+        ArrayList(selectedImages.reversed())
     }
 
     fun selectGallery(position: Int) {

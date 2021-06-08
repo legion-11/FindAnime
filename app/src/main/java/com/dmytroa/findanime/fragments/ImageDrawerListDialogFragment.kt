@@ -1,6 +1,8 @@
 package com.dmytroa.findanime.fragments
 
 import android.animation.LayoutTransition
+import android.content.Context
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
@@ -34,16 +36,25 @@ import java.util.*
  *    ImageDrawerListDialogFragment.newInstance(*args).show(supportFragmentManager, "dialog")
  * </pre>
  */
-class ImageDrawerListDialogFragment(private var listener: OnImageClickListener) : BottomSheetDialogFragment(),
+class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
     AdapterView.OnItemSelectedListener {
 
     // This property is only valid between onCreateView and onDestroyView.
     private val binding get() = _binding!!
     private var _binding: FragmentImageDrawerListDialogBinding? = null
     private lateinit var viewModel: ImageDrawerViewModel
+    private lateinit var listener: OnImageClickListener
+
+    private var imagesIds: ArrayList<Long> = arrayListOf()
+    private val uriExternal = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
 
     // minimum height of binding.resizableCurtainView
     private var resizableViewMinHeight: Int? = null
+
+    override fun onAttach(context: Context) {
+        super.onAttach(context)
+        listener = context as OnImageClickListener
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -64,9 +75,9 @@ class ImageDrawerListDialogFragment(private var listener: OnImageClickListener) 
         resizableViewMinHeight = resources.getDimension(R.dimen.resizable_view_min_height).toInt()
 //        setHasOptionsMenu(true)
 //        (activity as MainActivity).setSupportActionBar(binding.toolbar)
-//        binding.toolbar.setNavigationIcon(android.R.drawable.arrow_up_float)
-
-        binding.list.layoutManager = GridLayoutManager(context, 3)
+        binding.toolbar.setNavigationIcon(android.R.drawable.arrow_up_float)
+        val itemsInRow =  if (isLandscape()) 5 else 3
+        binding.list.layoutManager = GridLayoutManager(context, itemsInRow)
         binding.list.adapter = ImageDrawerItemAdapter()
         viewModel.images.observe(this) {
             (binding.list.adapter as ImageDrawerItemAdapter).setImages(it)
@@ -101,6 +112,13 @@ class ImageDrawerListDialogFragment(private var listener: OnImageClickListener) 
         // BottomSheetDialogFragment won't shrink after recyclerView shrinks
         bottomSheet.layoutParams.height = ViewGroup.LayoutParams.MATCH_PARENT
         val behavior = BottomSheetBehavior.from(bottomSheet as View)
+        //open full screen in landscape orientation
+        if (isLandscape()) { behavior.state = BottomSheetBehavior.STATE_EXPANDED }
+
+        if (behavior.state == BottomSheetBehavior.STATE_EXPANDED) {
+            resizeCurtainView(1f)
+            binding.toolbar.visibility = View.VISIBLE
+        }
         behavior.addBottomSheetCallback(object : BottomSheetBehavior.BottomSheetCallback() {
             override fun onStateChanged(bottomSheet: View, newState: Int) {}
 
@@ -137,14 +155,15 @@ class ImageDrawerListDialogFragment(private var listener: OnImageClickListener) 
         _binding = null
     }
 
+    private fun isLandscape() = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
     companion object {
-        fun newInstance(listener: OnImageClickListener) = ImageDrawerListDialogFragment(listener)
+        const val ARG_ITEMS_IN_ROW = "items_in_row"
+        fun newInstance() = ImageDrawerListDialogFragment()
     }
 
     /** adapter for local gallery images */
     private inner class ImageDrawerItemAdapter: RecyclerView.Adapter<ViewHolder>() {
-        private var imagesIds: ArrayList<Long> = arrayListOf()
-        private val uriExternal = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
             return ViewHolder(FragmentImageDrawerListDialogItemBinding.inflate(
@@ -188,7 +207,8 @@ class ImageDrawerListDialogFragment(private var listener: OnImageClickListener) 
         val image: ImageView = binding.galleryImage
 
         override fun onClick(v: View?) {
-            listener.onImageClick(adapterPosition)
+            val imageUri = Uri.withAppendedPath(uriExternal, imagesIds[adapterPosition].toString())
+            listener.onImageClick(imageUri)
         }
     }
 
@@ -214,7 +234,7 @@ class ImageDrawerListDialogFragment(private var listener: OnImageClickListener) 
 
     /** callback for click on ViewHolder */
     interface OnImageClickListener {
-        fun onImageClick(position: Int)
+        fun onImageClick(imageUri: Uri)
     }
 
     override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
