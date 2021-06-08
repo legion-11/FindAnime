@@ -22,6 +22,7 @@ import com.dmytroa.findanime.R
 import com.dmytroa.findanime.databinding.FragmentImageDrawerListDialogBinding
 import com.dmytroa.findanime.databinding.FragmentImageDrawerListDialogItemBinding
 import com.dmytroa.findanime.repositories.LocalFilesRepository
+import com.dmytroa.findanime.shared.SafeClickListener
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import java.util.*
@@ -80,6 +81,7 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
         binding.list.layoutManager = GridLayoutManager(context, itemsInRow)
         binding.list.adapter = ImageDrawerItemAdapter()
         viewModel.images.observe(this) {
+            binding.list.scrollToPosition(0)
             (binding.list.adapter as ImageDrawerItemAdapter).setImages(it)
         }
         setupSpinner()
@@ -115,6 +117,7 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
         //open full screen in landscape orientation
         if (isLandscape()) { behavior.state = BottomSheetBehavior.STATE_EXPANDED }
 
+        //show toolbar in expanded state
         if (behavior.state == BottomSheetBehavior.STATE_EXPANDED) {
             resizeCurtainView(1f)
             binding.toolbar.visibility = View.VISIBLE
@@ -242,4 +245,5 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
     }
 
     override fun onNothingSelected(parent: AdapterView<*>?) {}
+
 }

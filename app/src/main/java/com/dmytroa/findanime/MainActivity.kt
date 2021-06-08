@@ -2,18 +2,19 @@ package com.dmytroa.findanime
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
-import com.google.android.material.floatingactionbutton.FloatingActionButton
-import androidx.appcompat.app.AppCompatActivity
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
 import com.dmytroa.findanime.fragments.ImageDrawerListDialogFragment
+import com.dmytroa.findanime.shared.SafeClickListener
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.snackbar.Snackbar
 
 class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageClickListener {
@@ -29,10 +30,10 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
         setSupportActionBar(findViewById(R.id.toolbar))
 
         fab = findViewById(R.id.fab)
-        fab.setOnClickListener {
+        fab.setOnSafeClickListener {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
                 ActivityCompat.requestPermissions(this,  arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE), REQUEST_PERMISSION)
-                return@setOnClickListener
+                return@setOnSafeClickListener
             } else {
                 //TODO for now it always asks permission, change to getting from shared properties last answer
                 ImageDrawerListDialogFragment
@@ -85,5 +86,13 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
         supportFragmentManager.currentNavigationFragment?.let {fragment ->
             (fragment as ImageDrawerListDialogFragment.OnImageClickListener).onImageClick(imageUri)
         }
+    }
+
+
+    private fun View.setOnSafeClickListener(onSafeClick: (View) -> Unit) {
+        val safeClickListener = SafeClickListener {
+            onSafeClick(it)
+        }
+        setOnClickListener(safeClickListener)
     }
 }
