@@ -1,23 +1,42 @@
 package com.dmytroa.findanime
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import androidx.appcompat.app.AppCompatActivity
 import android.view.Menu
 import android.view.MenuItem
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.Fragment
+import androidx.fragment.app.FragmentManager
 import com.dmytroa.findanime.fragments.ImageDrawerListDialogFragment
+import com.google.android.material.snackbar.Snackbar
 
 class MainActivity : AppCompatActivity() {
+
+    private val FragmentManager.currentNavigationFragment: Fragment?
+        get() = primaryNavigationFragment?.childFragmentManager?.fragments?.first()
+
+    private lateinit var fab: FloatingActionButton
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         setSupportActionBar(findViewById(R.id.toolbar))
 
-        findViewById<FloatingActionButton>(R.id.fab).setOnClickListener { view ->
-            ImageDrawerListDialogFragment.newInstance(300).show(supportFragmentManager, "dialog")
-//            Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-//                    .setAction("Action", null).show()
+        fab = findViewById(R.id.fab)
+        fab.setOnClickListener {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this,  arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE), REQUEST_PERMISSION)
+                return@setOnClickListener
+            } else {
+                //TODO for now it always asks permission, change to getting from shared properties last answer
+                supportFragmentManager.currentNavigationFragment?.let { fragment ->
+                    ImageDrawerListDialogFragment.newInstance(fragment as ImageDrawerListDialogFragment.OnImageClickListener).show(supportFragmentManager, "dialog")
+                }
+            }
         }
     }
 
@@ -35,5 +54,29 @@ class MainActivity : AppCompatActivity() {
             R.id.action_settings -> true
             else -> super.onOptionsItemSelected(item)
         }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_PERMISSION) {
+            if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                supportFragmentManager.currentNavigationFragment?.let {fragment ->
+                    ImageDrawerListDialogFragment
+                        .newInstance(fragment as ImageDrawerListDialogFragment.OnImageClickListener)
+                        .show(supportFragmentManager, "dialog")
+                }
+            } else {
+                Snackbar.make(fab, "You can always enable gallery in settings", Snackbar.LENGTH_LONG)
+                    .setAction("Action", null).show()
+            }
+        }
+    }
+
+    companion object {
+        const val REQUEST_PERMISSION = 100
     }
 }

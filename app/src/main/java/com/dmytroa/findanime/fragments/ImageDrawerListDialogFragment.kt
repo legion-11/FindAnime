@@ -1,22 +1,29 @@
 package com.dmytroa.findanime.fragments
 
-import android.app.Dialog
+import android.animation.LayoutTransition
+import android.net.Uri
 import android.os.Bundle
+import android.provider.MediaStore
 import android.util.Log
-import com.google.android.material.bottomsheet.BottomSheetDialogFragment
-import androidx.recyclerview.widget.GridLayoutManager
-import androidx.recyclerview.widget.RecyclerView
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.FrameLayout
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.ImageView
-import com.dmytroa.findanime.MainActivity
+import androidx.lifecycle.ViewModelProvider
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
 import com.dmytroa.findanime.R
-import com.dmytroa.findanime.databinding.FragmentImageDrawerListDialogItemBinding
 import com.dmytroa.findanime.databinding.FragmentImageDrawerListDialogBinding
+import com.dmytroa.findanime.databinding.FragmentImageDrawerListDialogItemBinding
+import com.dmytroa.findanime.repositories.LocalFilesRepository
 import com.google.android.material.bottomsheet.BottomSheetBehavior
-import kotlin.random.Random
+import com.google.android.material.bottomsheet.BottomSheetDialogFragment
+import java.util.*
+
 
 /**
  *
@@ -24,15 +31,26 @@ import kotlin.random.Random
  *
  * You can show this modal bottom sheet from your activity like this:
  * <pre>
- *    ImageDrawerListDialogFragment.newInstance(30).show(supportFragmentManager, "dialog")
+ *    ImageDrawerListDialogFragment.newInstance(*args).show(supportFragmentManager, "dialog")
  * </pre>
  */
-class ImageDrawerListDialogFragment : BottomSheetDialogFragment() {
+class ImageDrawerListDialogFragment(private var listener: OnImageClickListener) : BottomSheetDialogFragment(),
+    AdapterView.OnItemSelectedListener {
 
-    private var _binding: FragmentImageDrawerListDialogBinding? = null
-    private val random = Random(42)
     // This property is only valid between onCreateView and onDestroyView.
     private val binding get() = _binding!!
+    private var _binding: FragmentImageDrawerListDialogBinding? = null
+    private lateinit var viewModel: ImageDrawerViewModel
+
+    // minimum height of binding.resizableCurtainView
+    private var resizableViewMinHeight: Int? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // make background transparent so binding.resizableCurtainView animation can be visible
+        setStyle(STYLE_NORMAL, R.style.CustomBottomSheetDialogTheme)
+        createViewModel()
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -43,41 +61,75 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment() {
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        setHasOptionsMenu(true)
-        (activity as MainActivity).setSupportActionBar(binding.toolbar)
+        resizableViewMinHeight = resources.getDimension(R.dimen.resizable_view_min_height).toInt()
+//        setHasOptionsMenu(true)
+//        (activity as MainActivity).setSupportActionBar(binding.toolbar)
+//        binding.toolbar.setNavigationIcon(android.R.drawable.arrow_up_float)
 
-        val list = binding.list
-        list.layoutManager = GridLayoutManager(context, 3)
-        list.adapter = arguments?.getInt(ARG_ITEM_COUNT)?.let { ImageDrawerItemAdapter(it) }
+        binding.list.layoutManager = GridLayoutManager(context, 3)
+        binding.list.adapter = ImageDrawerItemAdapter()
+        viewModel.images.observe(this) {
+            (binding.list.adapter as ImageDrawerItemAdapter).setImages(it)
+        }
+        setupSpinner()
+    }
+    private fun createViewModel() {
+        val albums = LocalFilesRepository.getAlbums(requireContext())
+        val allImagesLocalized = resources.getString(R.string.all_images)
+        if (albums.map { it.name }.contains(allImagesLocalized)) {
+            for (album in albums) {
+                if (album.name == allImagesLocalized) {
+                    album.name = album.name.toLowerCase(Locale.getDefault())
+                    break
+                }
+            }
+        }
+        val factory = ImageDrawerViewModel.ImageDrawerViewModelFactory(albums, allImagesLocalized)
+        viewModel = ViewModelProvider(this, factory).get(ImageDrawerViewModel::class.java)
+    }
 
+    private fun setupSpinner(){
+        val spinnerAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item,
+            viewModel.albumNames)
+        binding.toolbarSpinner.adapter = spinnerAdapter
+        binding.toolbarSpinner.onItemSelectedListener = this
     }
 
     override fun onStart() {
         super.onStart()
-        val bottomSheet = dialog?.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
+        val bottomSheet = dialog!!.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
+        // BottomSheetDialogFragment won't shrink after recyclerView shrinks
+        bottomSheet.layoutParams.height = ViewGroup.LayoutParams.MATCH_PARENT
         val behavior = BottomSheetBehavior.from(bottomSheet as View)
-
         behavior.addBottomSheetCallback(object : BottomSheetBehavior.BottomSheetCallback() {
-            override fun onStateChanged(bottomSheet: View, newState: Int) {
-                val stringState = when(newState) {
-                    BottomSheetBehavior.STATE_COLLAPSED -> "STATE_COLLAPSED"
-                    BottomSheetBehavior.STATE_DRAGGING -> "STATE_DRAGGING"
-                    BottomSheetBehavior.STATE_EXPANDED -> "STATE_EXPANDED"
-                    BottomSheetBehavior.STATE_HALF_EXPANDED -> "STATE_HALF_EXPANDED"
-                    BottomSheetBehavior.STATE_HIDDEN -> "STATE_HIDDEN"
-                    BottomSheetBehavior.STATE_SETTLING -> "STATE_SETTLING"
-
-                    else -> ""
-                }
-                Log.i("tagggg", stringState)
-            }
+            override fun onStateChanged(bottomSheet: View, newState: Int) {}
 
             override fun onSlide(bottomSheet: View, slideOffset: Float) {
-                Log.i("tagggg", slideOffset.toString())
+                when(slideOffset) {
+                    1f -> {
+                        binding.root.layoutTransition.enableTransitionType(LayoutTransition.CHANGING)
+                        binding.toolbar.visibility = View.VISIBLE
+                    }
+                    else -> {
+                        if (binding.toolbar.visibility == View.VISIBLE) {
+                            binding.root.layoutTransition.enableTransitionType(LayoutTransition.CHANGING)
+                            binding.toolbar.visibility = View.INVISIBLE
+                        }
+                        resizeCurtainView(slideOffset)
+                    }
+                }
             }
-
         })
+    }
 
+    private fun resizeCurtainView(slideOffset: Float){
+        binding.resizableCurtainView.layoutParams.height = getNewResizableCurtainHeight(slideOffset)
+        binding.resizableCurtainView.requestLayout()
+    }
+
+    private fun getNewResizableCurtainHeight(slideOffset: Float): Int {
+        if (slideOffset <= 0.9) return resizableViewMinHeight!!
+        return ((slideOffset - 0.9f) * 10f * binding.toolbar.height).toInt()
     }
 
     override fun onDestroyView() {
@@ -86,41 +138,88 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment() {
     }
 
     companion object {
-        // TODO: Customize parameter argument names
-        const val ARG_ITEM_COUNT = "item_count"
-        // TODO: Customize parameters
-        fun newInstance(itemCount: Int) = ImageDrawerListDialogFragment()
-            .apply {
-                arguments = Bundle().apply { putInt(ARG_ITEM_COUNT, itemCount) }
-            }
+        fun newInstance(listener: OnImageClickListener) = ImageDrawerListDialogFragment(listener)
     }
 
-    private inner class ViewHolder(binding: FragmentImageDrawerListDialogItemBinding):
-        RecyclerView.ViewHolder(binding.root) {
-//            val text: TextView = binding.text
-        val image: ImageView = binding.galleryImage
-    }
-
-    private inner class ImageDrawerItemAdapter(private val mItemCount: Int): RecyclerView.Adapter<ViewHolder>() {
+    /** adapter for local gallery images */
+    private inner class ImageDrawerItemAdapter: RecyclerView.Adapter<ViewHolder>() {
+        private var imagesIds: ArrayList<Long> = arrayListOf()
+        private val uriExternal = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-            return ViewHolder(
-                FragmentImageDrawerListDialogItemBinding.inflate(
+            return ViewHolder(FragmentImageDrawerListDialogItemBinding.inflate(
                     LayoutInflater.from(parent.context),
                     parent,
                     false)
-            ).apply {
-                image.maxHeight = parent.measuredWidth / 3
-            }
+            )
         }
-
 
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-//            holder.text.text = position.toString()
-            val id = if (random.nextBoolean()) R.drawable.tmp_image else R.drawable.tmp_image2
-            holder.image.setImageResource(id)
+            val imageUri = Uri.withAppendedPath(uriExternal, imagesIds[position].toString()) // Uri of the picture
+            Glide.with(holder.itemView.context)
+                .load(imageUri)
+                .centerCrop()
+                .into(holder.image)
+                .also {
+                    Log.i( "DeviceImageManager", "file loaded => $imageUri")
+                }
+
         }
 
-        override fun getItemCount() = mItemCount
+        override fun getItemCount() = imagesIds.size
+
+        fun setImages(newImagesIds: ArrayList<Long>) {
+            val oldIds = imagesIds
+            val diffResult = DiffUtil.calculateDiff(
+                ImageDrawerDiffCallback(oldIds, newImagesIds)
+            )
+            imagesIds = newImagesIds
+            diffResult.dispatchUpdatesTo(this)
+        }
     }
+
+    /** viewHolder for ImageDrawerItemAdapter */
+    private inner class ViewHolder(
+        binding: FragmentImageDrawerListDialogItemBinding): RecyclerView.ViewHolder(binding.root),
+        View.OnClickListener {
+        init {
+            itemView.setOnClickListener(this)
+        }
+        val image: ImageView = binding.galleryImage
+
+        override fun onClick(v: View?) {
+            listener.onImageClick(adapterPosition)
+        }
+    }
+
+    private inner class ImageDrawerDiffCallback(var oldImages: ArrayList<Long>,
+                                                var newImages: ArrayList<Long>): DiffUtil.Callback() {
+        override fun getOldListSize(): Int {
+            return oldImages.size
+        }
+
+        override fun getNewListSize(): Int {
+            return newImages.size
+        }
+
+        override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+            return oldImages[oldItemPosition] == newImages[newItemPosition]
+        }
+
+        override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+            return oldImages[oldItemPosition] == newImages[newItemPosition]
+        }
+
+    }
+
+    /** callback for click on ViewHolder */
+    interface OnImageClickListener {
+        fun onImageClick(position: Int)
+    }
+
+    override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+        viewModel.selectGallery(position)
+    }
+
+    override fun onNothingSelected(parent: AdapterView<*>?) {}
 }
