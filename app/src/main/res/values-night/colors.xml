@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--  see ic_gallery_in_circle.xml  -->
+    <color name="drawable_gallery_in_circle_background_gradient_start">@color/purple_500</color>
+    <color name="drawable_gallery_in_circle_background_gradient_end">@color/purple_200</color>
+    <color name="drawable_gallery_in_circle">@color/gray_for_dark_gallery</color>
+</resources>

@@ -11,4 +11,10 @@
     <color name="light_blue_600">#FF039BE5</color>
     <color name="gray_400">#FFBDBDBD</color>
     <color name="gray_600">#FF757575</color>
+    <color name="gray_for_dark_gallery">#BCBCBC</color>
+
+    <!--  see ic_gallery_in_circle.xml  -->
+    <color name="drawable_gallery_in_circle_background_gradient_start">@color/purple_200</color>
+    <color name="drawable_gallery_in_circle_background_gradient_end">@color/purple_700</color>
+    <color name="drawable_gallery_in_circle">@color/white</color>
 </resources>

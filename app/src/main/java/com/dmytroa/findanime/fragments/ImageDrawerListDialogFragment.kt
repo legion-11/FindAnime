@@ -17,12 +17,12 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.viewbinding.ViewBinding
 import com.bumptech.glide.Glide
 import com.dmytroa.findanime.R
 import com.dmytroa.findanime.databinding.FragmentImageDrawerListDialogBinding
 import com.dmytroa.findanime.databinding.FragmentImageDrawerListDialogItemBinding
 import com.dmytroa.findanime.repositories.LocalFilesRepository
-import com.dmytroa.findanime.shared.SafeClickListener
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import java.util.*
@@ -48,6 +48,32 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
 
     private var imagesIds: ArrayList<Long> = arrayListOf()
     private val uriExternal = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+
+    private lateinit var behavior: BottomSheetBehavior<View>
+    private val slidingListener = object : BottomSheetBehavior.BottomSheetCallback() {
+        override fun onStateChanged(bottomSheet: View, newState: Int) {
+            Log.i(TAG, "onStateChanged: $newState")
+            if (isLandscape() && newState == BottomSheetBehavior.STATE_SETTLING) {
+                dismiss()
+            }
+        }
+
+        override fun onSlide(bottomSheet: View, slideOffset: Float) {
+            when(slideOffset) {
+                1f -> {
+                    binding.root.layoutTransition.enableTransitionType(LayoutTransition.CHANGING)
+                    binding.toolbar.visibility = View.VISIBLE
+                }
+                else -> {
+                    if (binding.toolbar.visibility == View.VISIBLE) {
+                        binding.root.layoutTransition.enableTransitionType(LayoutTransition.CHANGING)
+                        binding.toolbar.visibility = View.INVISIBLE
+                    }
+                    resizeCurtainView(slideOffset)
+                }
+            }
+        }
+    }
 
     // minimum height of binding.resizableCurtainView
     private var resizableViewMinHeight: Int? = null
@@ -102,8 +128,10 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
     }
 
     private fun setupSpinner(){
-        val spinnerAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item,
-            viewModel.albumNames)
+        val spinnerAdapter = ArrayAdapter(requireContext(),
+            android.R.layout.simple_spinner_dropdown_item, viewModel.albumNames)
+            .also { it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
+
         binding.toolbarSpinner.adapter = spinnerAdapter
         binding.toolbarSpinner.onItemSelectedListener = this
     }
@@ -113,7 +141,7 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
         val bottomSheet = dialog!!.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
         // BottomSheetDialogFragment won't shrink after recyclerView shrinks
         bottomSheet.layoutParams.height = ViewGroup.LayoutParams.MATCH_PARENT
-        val behavior = BottomSheetBehavior.from(bottomSheet as View)
+        behavior = BottomSheetBehavior.from(bottomSheet as View)
         //open full screen in landscape orientation
         if (isLandscape()) { behavior.state = BottomSheetBehavior.STATE_EXPANDED }
 
@@ -122,25 +150,9 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
             resizeCurtainView(1f)
             binding.toolbar.visibility = View.VISIBLE
         }
-        behavior.addBottomSheetCallback(object : BottomSheetBehavior.BottomSheetCallback() {
-            override fun onStateChanged(bottomSheet: View, newState: Int) {}
 
-            override fun onSlide(bottomSheet: View, slideOffset: Float) {
-                when(slideOffset) {
-                    1f -> {
-                        binding.root.layoutTransition.enableTransitionType(LayoutTransition.CHANGING)
-                        binding.toolbar.visibility = View.VISIBLE
-                    }
-                    else -> {
-                        if (binding.toolbar.visibility == View.VISIBLE) {
-                            binding.root.layoutTransition.enableTransitionType(LayoutTransition.CHANGING)
-                            binding.toolbar.visibility = View.INVISIBLE
-                        }
-                        resizeCurtainView(slideOffset)
-                    }
-                }
-            }
-        })
+
+        behavior.addBottomSheetCallback(slidingListener)
     }
 
     private fun resizeCurtainView(slideOffset: Float){
@@ -155,40 +167,52 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
 
     override fun onDestroyView() {
         super.onDestroyView()
+        behavior.removeBottomSheetCallback(slidingListener)
         _binding = null
     }
 
     private fun isLandscape() = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     companion object {
-        const val ARG_ITEMS_IN_ROW = "items_in_row"
+//        const val ARG_ITEMS_IN_ROW = "items_in_row"
         fun newInstance() = ImageDrawerListDialogFragment()
+        const val GALLERY_TYPE = 0
+        const val IMAGE_TYPE = 1
+        const val TAG = "ImageDrawerFragment"
+
     }
 
     /** adapter for local gallery images */
-    private inner class ImageDrawerItemAdapter: RecyclerView.Adapter<ViewHolder>() {
+    private inner class ImageDrawerItemAdapter: RecyclerView.Adapter<BaseViewHolder>() {
 
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-            return ViewHolder(FragmentImageDrawerListDialogItemBinding.inflate(
-                    LayoutInflater.from(parent.context),
-                    parent,
-                    false)
-            )
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): BaseViewHolder {
+            return when(viewType) {
+                IMAGE_TYPE -> ImageViewHolder(
+                    FragmentImageDrawerListDialogItemBinding.inflate(
+                            LayoutInflater.from(parent.context), parent, false)
+                    )
+
+                else -> GalleryViewHolder(
+                    FragmentImageDrawerListDialogItemBinding.inflate(
+                            LayoutInflater.from(parent.context), parent, false)
+                    )
+            }
         }
 
-        override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-            val imageUri = Uri.withAppendedPath(uriExternal, imagesIds[position].toString()) // Uri of the picture
-            Glide.with(holder.itemView.context)
-                .load(imageUri)
-                .centerCrop()
-                .into(holder.image)
-                .also {
-                    Log.i( "DeviceImageManager", "file loaded => $imageUri")
-                }
-
+        override fun onBindViewHolder(holder: BaseViewHolder, position: Int) {
+            if (holder.itemViewType == IMAGE_TYPE) {
+                // position - 1 because zero position is taken by GalleryViewHolder
+                setupImageViewHolder(holder as ImageViewHolder, position - 1)
+            } else {
+                setupGalleryViewHolder(holder as GalleryViewHolder, position)
+            }
         }
 
-        override fun getItemCount() = imagesIds.size
+        override fun getItemCount() = imagesIds.size + 1
+
+        override fun getItemViewType(position: Int): Int {
+            return if (position == 0) return GALLERY_TYPE else IMAGE_TYPE
+        }
 
         fun setImages(newImagesIds: ArrayList<Long>) {
             val oldIds = imagesIds
@@ -198,20 +222,49 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
             imagesIds = newImagesIds
             diffResult.dispatchUpdatesTo(this)
         }
+
+        fun setupImageViewHolder(holder: ImageViewHolder, position: Int) {
+            val imageUri = Uri.withAppendedPath(uriExternal, imagesIds[position].toString()) // Uri of the picture
+            Glide.with(holder.itemView.context)
+                .load(imageUri)
+                .centerCrop()
+                .into(holder.image)
+                .also { Log.i( "DeviceImageManager", "file loaded => $imageUri") }
+        }
+
+        fun setupGalleryViewHolder(holder: GalleryViewHolder, position: Int) {
+            holder.image.setImageResource(R.drawable.ic_gallery_in_circle)
+        }
     }
 
+
+    /** baseViewHolder for ImageDrawerItemAdapter */
+    abstract class BaseViewHolder(binding: ViewBinding): RecyclerView.ViewHolder(binding.root)
+
     /** viewHolder for ImageDrawerItemAdapter */
-    private inner class ViewHolder(
-        binding: FragmentImageDrawerListDialogItemBinding): RecyclerView.ViewHolder(binding.root),
-        View.OnClickListener {
-        init {
-            itemView.setOnClickListener(this)
-        }
+    private inner class GalleryViewHolder(binding: FragmentImageDrawerListDialogItemBinding):
+        BaseViewHolder(binding), View.OnClickListener {
+
         val image: ImageView = binding.galleryImage
+        init { itemView.setOnClickListener(this) }
+
 
         override fun onClick(v: View?) {
-            val imageUri = Uri.withAppendedPath(uriExternal, imagesIds[adapterPosition].toString())
+            dismiss()
+        }
+    }
+
+    /** viewHolder for Images from gallery */
+    private inner class ImageViewHolder(binding: FragmentImageDrawerListDialogItemBinding):
+        BaseViewHolder(binding), View.OnClickListener {
+
+        val image: ImageView = binding.galleryImage
+        init { itemView.setOnClickListener(this) }
+
+        override fun onClick(v: View?) {
+            val imageUri = Uri.withAppendedPath(uriExternal, imagesIds[adapterPosition - 1].toString())
             listener.onImageClick(imageUri)
+            dismiss()
         }
     }
 
