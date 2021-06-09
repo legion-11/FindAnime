@@ -2,5 +2,6 @@
 
     <style name="CustomBottomSheetDialogTheme.Toolbar" parent="Widget.AppCompat.Toolbar">
         <item name="colorControlHighlight">@color/ripple_material_dark</item>
+        <item name="android:textColorSecondary">@color/white</item>
     </style>
 </resources>

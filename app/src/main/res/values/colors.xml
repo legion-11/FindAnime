@@ -11,10 +11,22 @@
     <color name="light_blue_600">#FF039BE5</color>
     <color name="gray_400">#FFBDBDBD</color>
     <color name="gray_600">#FF757575</color>
-    <color name="gray_for_dark_gallery">#BCBCBC</color>
 
-    <!--  see ic_gallery_in_circle.xml  -->
-    <color name="drawable_gallery_in_circle_background_gradient_start">@color/purple_200</color>
-    <color name="drawable_gallery_in_circle_background_gradient_end">@color/purple_700</color>
-    <color name="drawable_gallery_in_circle">@color/white</color>
+    <color name="gray_for_dark_gallery">#BCBCBC</color>
+    <color name="dark_background">#1B1B1B</color>
+    <color name="dark_grey_on_dark_background">#222222</color>
+    <color name="grey_on_white_background">#F5F5F5</color>
+
+    <!--  drawer_spinner_item  -->
+    <color name="theme_color_inverse">@color/black</color>
+
+    <!--  ic_gallery_in_stroke.xml  -->
+    <color name="drawable_gallery_in_stroke_background_gradient_start">@color/purple_200</color>
+    <color name="drawable_gallery_in_stroke_background_gradient_end">@color/purple_700</color>
+    <color name="drawable_gallery_in_stroke">@color/white</color>
+
+    <!--  fragment_image_drawer_list_dialog.xml  -->
+    <color name="drawer_background">@color/white</color>
+    <color name="drawer_toolbar_color">@color/grey_on_white_background</color>
+
 </resources>

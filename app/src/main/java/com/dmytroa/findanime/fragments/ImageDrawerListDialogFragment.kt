@@ -104,6 +104,7 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
         resizableViewMinHeight = resources.getDimension(R.dimen.resizable_view_min_height).toInt()
 
         binding.toolbar.setNavigationIcon(R.drawable.abc_ic_ab_back_material)
+
         binding.toolbar.setNavigationOnClickListener { dismiss() }
 
         val itemsInRow =  if (resources.getBoolean(R.bool.isTablet)) 5 else 3
@@ -133,7 +134,7 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
     private fun setupSpinner(){
         val spinnerAdapter = ArrayAdapter(requireContext(),
             android.R.layout.simple_spinner_dropdown_item, viewModel.albumNames)
-            .also { it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
+            .also { it.setDropDownViewResource(R.layout.drawer_spinner_item) }
 
         binding.toolbarSpinner.adapter = spinnerAdapter
         binding.toolbarSpinner.onItemSelectedListener = this

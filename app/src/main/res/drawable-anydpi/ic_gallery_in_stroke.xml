@@ -3,9 +3,9 @@
     <item>
         <shape android:shape="rectangle" >
             <gradient
-                android:startColor="@color/drawable_gallery_in_circle_background_gradient_start"
-                android:endColor="@color/drawable_gallery_in_circle_background_gradient_end"
-                android:centerColor="@color/drawable_gallery_in_circle_background_gradient_end"
+                android:startColor="@color/drawable_gallery_in_stroke_background_gradient_start"
+                android:endColor="@color/drawable_gallery_in_stroke_background_gradient_end"
+                android:centerColor="@color/drawable_gallery_in_stroke_background_gradient_end"
                 android:centerY="0.75"
                 android:angle="45"
                 />
@@ -22,7 +22,7 @@
         <shape
             android:shape="rectangle"
             android:useLevel="true">
-            <stroke android:width="0.5dp" android:color="@color/drawable_gallery_in_circle" />
+            <stroke android:width="0.5dp" android:color="@color/drawable_gallery_in_stroke" />
             <corners android:radius="4dp" />
         </shape>
     </item>

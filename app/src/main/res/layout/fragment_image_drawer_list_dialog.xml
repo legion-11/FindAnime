@@ -17,7 +17,7 @@
             android:layout_width="match_parent"
             android:layout_height="@dimen/resizable_view_min_height"
             android:layout_gravity="bottom"
-            android:background="@color/white"
+            android:background="@color/drawer_background"
             android:minHeight="@dimen/resizable_view_min_height">
 
             <View
@@ -33,7 +33,7 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="?attr/colorPrimary"
+            android:background="@color/drawer_toolbar_color"
             android:minHeight="?attr/actionBarSize"
             android:theme="@style/CustomBottomSheetDialogTheme.Toolbar"
             android:visibility="invisible"
@@ -41,6 +41,7 @@
 
             <Spinner
                 android:id="@+id/toolbarSpinner"
+                android:backgroundTint="@color/theme_color_inverse"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content" />
         </androidx.appcompat.widget.Toolbar>
@@ -56,7 +57,7 @@
         android:paddingTop="@dimen/list_item_spacing_half"
         android:paddingBottom="@dimen/list_item_spacing_half"
         android:layout_weight="1"
-        android:background="@color/white"
+        android:background="@color/drawer_background"
         tools:context=".fragments.ImageDrawerListDialogFragment"
         tools:listitem="@layout/fragment_image_drawer_list_dialog_item" />
 </LinearLayout>
