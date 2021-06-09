@@ -3,6 +3,7 @@ package com.dmytroa.findanime.fragments
 import android.animation.LayoutTransition
 import android.content.Context
 import android.content.res.Configuration
+import android.content.res.Resources
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
@@ -51,12 +52,7 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
 
     private lateinit var behavior: BottomSheetBehavior<View>
     private val slidingListener = object : BottomSheetBehavior.BottomSheetCallback() {
-        override fun onStateChanged(bottomSheet: View, newState: Int) {
-            Log.i(TAG, "onStateChanged: $newState")
-            if (isLandscape() && newState == BottomSheetBehavior.STATE_SETTLING) {
-                dismiss()
-            }
-        }
+        override fun onStateChanged(bottomSheet: View, newState: Int) {}
 
         override fun onSlide(bottomSheet: View, slideOffset: Float) {
             when(slideOffset) {
@@ -77,6 +73,9 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
 
     // minimum height of binding.resizableCurtainView
     private var resizableViewMinHeight: Int? = null
+
+    private val Int.px: Int
+        get() = (this * Resources.getSystem().displayMetrics.density).toInt()
 
     override fun onAttach(context: Context) {
         super.onAttach(context)
@@ -142,8 +141,13 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
         // BottomSheetDialogFragment won't shrink after recyclerView shrinks
         bottomSheet.layoutParams.height = ViewGroup.LayoutParams.MATCH_PARENT
         behavior = BottomSheetBehavior.from(bottomSheet as View)
-        //open full screen in landscape orientation
-        if (isLandscape()) { behavior.state = BottomSheetBehavior.STATE_EXPANDED }
+        behavior.peekHeight = (Resources.getSystem().displayMetrics.heightPixels * 0.8).toInt()
+
+        if (resources.getBoolean(R.bool.isTablet)) {
+            // you can go more fancy and vary the bottom sheet width depending on the screen width
+            // see recommendations on https://material.io/components/sheets-bottom#specs
+            bottomSheet.layoutParams.width = 600.px
+        }
 
         //show toolbar in expanded state
         if (behavior.state == BottomSheetBehavior.STATE_EXPANDED) {
