@@ -2,6 +2,6 @@
     <dimen name="fab_margin">16dp</dimen>
     <dimen name="list_item_spacing">16dp</dimen>
     <dimen name="list_item_spacing_half">8dp</dimen>
-    <dimen name="resizable_view_min_height">6dp</dimen>
+    <dimen name="resizable_view_min_height">12dp</dimen>
     <dimen name="resizable_view_handle_height">4dp</dimen>
 </resources>

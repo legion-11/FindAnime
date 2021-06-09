@@ -1,7 +1,9 @@
 package com.dmytroa.findanime.fragments
 
 import android.animation.LayoutTransition
+import android.app.Activity.RESULT_OK
 import android.content.Context
+import android.content.Intent
 import android.content.res.Configuration
 import android.content.res.Resources
 import android.net.Uri
@@ -14,6 +16,7 @@ import android.view.ViewGroup
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.ImageView
+import android.widget.Toast
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.GridLayoutManager
@@ -101,7 +104,10 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
         resizableViewMinHeight = resources.getDimension(R.dimen.resizable_view_min_height).toInt()
 //        setHasOptionsMenu(true)
 //        (activity as MainActivity).setSupportActionBar(binding.toolbar)
-        binding.toolbar.setNavigationIcon(android.R.drawable.arrow_up_float)
+        binding.toolbar.setNavigationIcon(R.drawable.abc_ic_ab_back_material)
+        binding.toolbar.setNavigationOnClickListener {
+            dismiss()
+        }
         val itemsInRow =  if (isLandscape()) 5 else 3
         binding.list.layoutManager = GridLayoutManager(context, itemsInRow)
         binding.list.adapter = ImageDrawerItemAdapter()
@@ -160,13 +166,18 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
     }
 
     private fun resizeCurtainView(slideOffset: Float){
-        binding.resizableCurtainView.layoutParams.height = getNewResizableCurtainHeight(slideOffset)
-        binding.resizableCurtainView.requestLayout()
+        val newHeight = getNewResizableCurtainHeight(slideOffset)
+        if (newHeight != resizableViewMinHeight!!) {
+            binding.resizableCurtainView.layoutParams.height = newHeight
+            binding.resizableCurtainView.requestLayout()
+        }
     }
 
     private fun getNewResizableCurtainHeight(slideOffset: Float): Int {
         if (slideOffset <= 0.9) return resizableViewMinHeight!!
-        return ((slideOffset - 0.9f) * 10f * binding.toolbar.height).toInt()
+        val newHeight = ((slideOffset - 0.9f) * 10f * binding.toolbar.height).toInt()
+        if (newHeight < resizableViewMinHeight!!) return resizableViewMinHeight!!
+        return newHeight
     }
 
     override fun onDestroyView() {
@@ -182,8 +193,22 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
         fun newInstance() = ImageDrawerListDialogFragment()
         const val GALLERY_TYPE = 0
         const val IMAGE_TYPE = 1
+        const val RESULT_LOAD_IMG = 200
         const val TAG = "ImageDrawerFragment"
 
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == RESULT_LOAD_IMG && resultCode == RESULT_OK) {
+            val imageUri = data?.data
+            if (imageUri != null) {
+                listener.onImageClick(imageUri)
+                dismiss()
+            } else {
+                Toast.makeText(activity, "Something went wrong", Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     /** adapter for local gallery images */
@@ -237,10 +262,9 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
         }
 
         fun setupGalleryViewHolder(holder: GalleryViewHolder, position: Int) {
-            holder.image.setImageResource(R.drawable.ic_gallery_in_circle)
+            holder.image.setImageResource(R.drawable.ic_gallery_in_stroke)
         }
     }
-
 
     /** baseViewHolder for ImageDrawerItemAdapter */
     abstract class BaseViewHolder(binding: ViewBinding): RecyclerView.ViewHolder(binding.root)
@@ -254,7 +278,9 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
 
 
         override fun onClick(v: View?) {
-            dismiss()
+            val photoPickerIntent = Intent(Intent.ACTION_PICK)
+            photoPickerIntent.type = "image/*"
+            startActivityForResult(photoPickerIntent, RESULT_LOAD_IMG)
         }
     }
 

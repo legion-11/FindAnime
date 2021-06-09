@@ -6,7 +6,7 @@
                 android:startColor="@color/drawable_gallery_in_circle_background_gradient_start"
                 android:endColor="@color/drawable_gallery_in_circle_background_gradient_end"
                 android:centerColor="@color/drawable_gallery_in_circle_background_gradient_end"
-                android:centerY="0.65"
+                android:centerY="0.75"
                 android:angle="45"
                 />
             <corners android:radius="4dp" />

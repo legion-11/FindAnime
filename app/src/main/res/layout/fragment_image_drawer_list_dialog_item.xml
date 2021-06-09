@@ -25,7 +25,7 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
-            tools:srcCompat="@drawable/ic_gallery_in_circle" />
+            tools:srcCompat="@drawable/ic_gallery_in_stroke" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </FrameLayout>

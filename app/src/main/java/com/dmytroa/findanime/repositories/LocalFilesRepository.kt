@@ -56,6 +56,9 @@ object LocalFilesRepository {
             }
         }
         cur?.close()
+        for (album in albums) {
+            album.imageIds.reverse()
+        }
         Log.i( TAG, "all albums => $albums")
         return albums
     }

@@ -13,7 +13,7 @@ class ImageDrawerViewModel(private val albums: ArrayList<Album>,
         var selectedImages: ArrayList<Long> = arrayListOf()
         if (str == allImagesStringLocalized) {
             //sorted - so images will be in  order it was taken (not album after album)
-            selectedImages = ArrayList(albums.flatMap { it.imageIds }.sorted())
+            selectedImages = ArrayList(albums.flatMap { it.imageIds }.sorted().reversed())
         } else {
             for (album in albums) {
                 if (album.name == str) {
@@ -22,7 +22,7 @@ class ImageDrawerViewModel(private val albums: ArrayList<Album>,
                 }
             }
         }
-        ArrayList(selectedImages.reversed())
+        selectedImages
     }
 
     fun selectGallery(position: Int) {

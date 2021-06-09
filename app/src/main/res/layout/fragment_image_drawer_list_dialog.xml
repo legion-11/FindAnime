@@ -24,7 +24,7 @@
                 android:layout_width="30dp"
                 android:layout_height="@dimen/resizable_view_handle_height"
                 android:layout_gravity="center_horizontal|top"
-                android:layout_margin="1dp"
+                android:layout_margin="4dp"
                 android:background="@color/gray_400"
                 android:minHeight="@dimen/resizable_view_min_height" />
         </FrameLayout>
