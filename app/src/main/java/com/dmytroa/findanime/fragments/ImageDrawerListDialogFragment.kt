@@ -4,7 +4,6 @@ import android.animation.LayoutTransition
 import android.app.Activity.RESULT_OK
 import android.content.Context
 import android.content.Intent
-import android.content.res.Configuration
 import android.content.res.Resources
 import android.net.Uri
 import android.os.Bundle
@@ -38,7 +37,7 @@ import java.util.*
  *
  * You can show this modal bottom sheet from your activity like this:
  * <pre>
- *    ImageDrawerListDialogFragment.newInstance(*args).show(supportFragmentManager, "dialog")
+ *    ImageDrawerListDialogFragment.newInstance().show(supportFragmentManager, "dialog")
  * </pre>
  */
 class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
@@ -77,6 +76,7 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
     // minimum height of binding.resizableCurtainView
     private var resizableViewMinHeight: Int? = null
 
+    // converts dp to px
     private val Int.px: Int
         get() = (this * Resources.getSystem().displayMetrics.density).toInt()
 
@@ -102,13 +102,11 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         resizableViewMinHeight = resources.getDimension(R.dimen.resizable_view_min_height).toInt()
-//        setHasOptionsMenu(true)
-//        (activity as MainActivity).setSupportActionBar(binding.toolbar)
+
         binding.toolbar.setNavigationIcon(R.drawable.abc_ic_ab_back_material)
-        binding.toolbar.setNavigationOnClickListener {
-            dismiss()
-        }
-        val itemsInRow =  if (isLandscape()) 5 else 3
+        binding.toolbar.setNavigationOnClickListener { dismiss() }
+
+        val itemsInRow =  if (resources.getBoolean(R.bool.isTablet)) 5 else 3
         binding.list.layoutManager = GridLayoutManager(context, itemsInRow)
         binding.list.adapter = ImageDrawerItemAdapter()
         viewModel.images.observe(this) {
@@ -185,8 +183,6 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
         behavior.removeBottomSheetCallback(slidingListener)
         _binding = null
     }
-
-    private fun isLandscape() = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     companion object {
 //        const val ARG_ITEMS_IN_ROW = "items_in_row"

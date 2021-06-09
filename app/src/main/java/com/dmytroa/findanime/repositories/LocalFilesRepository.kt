@@ -9,6 +9,9 @@ import com.dmytroa.findanime.dataClasses.Album
 object LocalFilesRepository {
 
     private const val TAG = "LocalFilesRepository"
+    /**
+     * Obtain all albums on device
+     * */
     @SuppressLint("InlinedApi") // ImageColumns.BUCKET_DISPLAY_NAME was available before api 29
     fun getAlbums(context: Context): ArrayList<Album> {
         val albums = arrayListOf<Album>()
@@ -56,6 +59,7 @@ object LocalFilesRepository {
             }
         }
         cur?.close()
+        // LIFO (last taken image will be first in list)
         for (album in albums) {
             album.imageIds.reverse()
         }
