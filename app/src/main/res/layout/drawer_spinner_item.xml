@@ -3,11 +3,13 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:gravity="start"
-    android:padding="8dip"
-    android:background="@color/drawer_toolbar_color"
+    android:gravity="start|center_vertical"
+    android:maxLines="1"
+    android:ellipsize="end"
+    android:paddingStart="8dp"
+    android:paddingEnd="8dp"
     android:textColor="@color/theme_color_inverse"
-    android:textSize="16sp"
+    android:textSize="18sp"
     tools:text="Text text">
 
 </TextView>

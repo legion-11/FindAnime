@@ -7,5 +7,4 @@
         <item name="colorControlHighlight">@color/ripple_material_light</item>
         <item name="android:textColorSecondary">@color/black</item>
     </style>
-
 </resources>

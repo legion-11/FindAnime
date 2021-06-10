@@ -42,7 +42,8 @@
             <Spinner
                 android:id="@+id/toolbarSpinner"
                 android:backgroundTint="@color/theme_color_inverse"
-                android:layout_width="match_parent"
+                android:layout_marginHorizontal="16dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content" />
         </androidx.appcompat.widget.Toolbar>
 

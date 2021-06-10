@@ -133,8 +133,7 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
 
     private fun setupSpinner(){
         val spinnerAdapter = ArrayAdapter(requireContext(),
-            android.R.layout.simple_spinner_dropdown_item, viewModel.albumNames)
-            .also { it.setDropDownViewResource(R.layout.drawer_spinner_item) }
+            R.layout.drawer_spinner_item, viewModel.albumNames)
 
         binding.toolbarSpinner.adapter = spinnerAdapter
         binding.toolbarSpinner.onItemSelectedListener = this
@@ -242,9 +241,7 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
 
         fun setImages(newImagesIds: ArrayList<Long>) {
             val oldIds = imagesIds
-            val diffResult = DiffUtil.calculateDiff(
-                ImageDrawerDiffCallback(oldIds, newImagesIds)
-            )
+            val diffResult = DiffUtil.calculateDiff(ImageDrawerDiffCallback(oldIds, newImagesIds))
             imagesIds = newImagesIds
             diffResult.dispatchUpdatesTo(this)
         }
@@ -255,7 +252,7 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
                 .load(imageUri)
                 .centerCrop()
                 .into(holder.image)
-                .also { Log.i( "DeviceImageManager", "file loaded => $imageUri") }
+                .also { Log.i( "ImageDrawerItemAdapter", "file loaded => $imageUri") }
         }
 
         fun setupGalleryViewHolder(holder: GalleryViewHolder, position: Int) {
