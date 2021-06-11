@@ -41,10 +41,11 @@
 
             <Spinner
                 android:id="@+id/toolbarSpinner"
-                android:backgroundTint="@color/theme_color_inverse"
-                android:layout_marginHorizontal="16dp"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="16dp"
+                android:backgroundTint="@color/theme_color_inverse"
+                android:dropDownWidth="match_parent" />
         </androidx.appcompat.widget.Toolbar>
 
 

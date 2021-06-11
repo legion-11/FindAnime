@@ -187,8 +187,8 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
     companion object {
 //        const val ARG_ITEMS_IN_ROW = "items_in_row"
         fun newInstance() = ImageDrawerListDialogFragment()
-        const val GALLERY_TYPE = 0
-        const val IMAGE_TYPE = 1
+        const val GALLERY_TYPE = -1
+        const val IMAGE_TYPE = 0
         const val RESULT_LOAD_IMG = 200
         const val TAG = "ImageDrawerFragment"
 
@@ -227,22 +227,23 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
         override fun onBindViewHolder(holder: BaseViewHolder, position: Int) {
             if (holder.itemViewType == IMAGE_TYPE) {
                 // position - 1 because zero position is taken by GalleryViewHolder
-                setupImageViewHolder(holder as ImageViewHolder, position - 1)
+                setupImageViewHolder(holder as ImageViewHolder, position)
             } else {
                 setupGalleryViewHolder(holder as GalleryViewHolder, position)
             }
         }
 
-        override fun getItemCount() = imagesIds.size + 1
+        override fun getItemCount() = imagesIds.size
 
         override fun getItemViewType(position: Int): Int {
-            return if (position == 0) return GALLERY_TYPE else IMAGE_TYPE
+            return if (imagesIds[position] == GALLERY_TYPE.toLong()) GALLERY_TYPE else IMAGE_TYPE
         }
 
         fun setImages(newImagesIds: ArrayList<Long>) {
             val oldIds = imagesIds
             val diffResult = DiffUtil.calculateDiff(ImageDrawerDiffCallback(oldIds, newImagesIds))
-            imagesIds = newImagesIds
+            imagesIds.clear()
+            imagesIds.addAll(newImagesIds)
             diffResult.dispatchUpdatesTo(this)
         }
 

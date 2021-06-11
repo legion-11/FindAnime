@@ -2,6 +2,7 @@ package com.dmytroa.findanime.fragments
 
 import androidx.lifecycle.*
 import com.dmytroa.findanime.dataClasses.Album
+import com.dmytroa.findanime.fragments.ImageDrawerListDialogFragment.Companion.GALLERY_TYPE
 
 class ImageDrawerViewModel(private val albums: ArrayList<Album>,
                            allImagesStringLocalized: String) : ViewModel() {
@@ -13,7 +14,8 @@ class ImageDrawerViewModel(private val albums: ArrayList<Album>,
         var selectedImages: ArrayList<Long> = arrayListOf()
         if (str == allImagesStringLocalized) {
             //sorted - so images will be in  order it was taken (not album after album)
-            selectedImages = ArrayList(albums.flatMap { it.imageIds }.sorted().reversed())
+            selectedImages =
+                ArrayList( listOf((GALLERY_TYPE).toLong()) + albums.flatMap { it.imageIds }.sorted().reversed())
         } else {
             for (album in albums) {
                 if (album.name == str) {
@@ -39,4 +41,6 @@ class ImageDrawerViewModel(private val albums: ArrayList<Album>,
             throw IllegalArgumentException("Unknown ViewModel class")
         }
     }
+
+
 }
