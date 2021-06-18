@@ -41,6 +41,4 @@ class ImageDrawerViewModel(private val albums: ArrayList<Album>,
             throw IllegalArgumentException("Unknown ViewModel class")
         }
     }
-
-
 }

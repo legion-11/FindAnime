@@ -43,6 +43,18 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
         }
     }
 
+    fun hideFab() {
+        if (fab.isShown) {
+            fab.hide()
+        }
+    }
+
+    fun showFab() {
+        if(fab.isOrWillBeHidden) {
+            fab.show()
+        }
+    }
+
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         // Inflate the menu; this adds items to the action bar if it is present.
         menuInflater.inflate(R.menu.menu_main, menu)

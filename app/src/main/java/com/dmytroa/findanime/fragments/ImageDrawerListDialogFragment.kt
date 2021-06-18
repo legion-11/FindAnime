@@ -16,6 +16,7 @@ import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.ImageView
 import android.widget.Toast
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.GridLayoutManager
@@ -122,7 +123,7 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
         if (albums.map { it.name }.contains(allImagesLocalized)) {
             for (album in albums) {
                 if (album.name == allImagesLocalized) {
-                    album.name = album.name.toLowerCase(Locale.getDefault())
+                    album.name = album.name.lowercase(Locale.getDefault())
                     break
                 }
             }
@@ -191,7 +192,6 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
         const val IMAGE_TYPE = 0
         const val RESULT_LOAD_IMG = 200
         const val TAG = "ImageDrawerFragment"
-
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -226,7 +226,6 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
 
         override fun onBindViewHolder(holder: BaseViewHolder, position: Int) {
             if (holder.itemViewType == IMAGE_TYPE) {
-                // position - 1 because zero position is taken by GalleryViewHolder
                 setupImageViewHolder(holder as ImageViewHolder, position)
             } else {
                 setupGalleryViewHolder(holder as GalleryViewHolder, position)
@@ -262,7 +261,7 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
     }
 
     /** baseViewHolder for ImageDrawerItemAdapter */
-    abstract class BaseViewHolder(binding: ViewBinding): RecyclerView.ViewHolder(binding.root)
+    private abstract inner class BaseViewHolder(binding: ViewBinding): RecyclerView.ViewHolder(binding.root)
 
     /** viewHolder for ImageDrawerItemAdapter */
     private inner class GalleryViewHolder(binding: FragmentImageDrawerListDialogItemBinding):
@@ -273,8 +272,7 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
 
 
         override fun onClick(v: View?) {
-            val photoPickerIntent = Intent(Intent.ACTION_PICK)
-            photoPickerIntent.type = "image/*"
+            val photoPickerIntent = Intent(Intent.ACTION_PICK).apply { type = "image/*" }
             startActivityForResult(photoPickerIntent, RESULT_LOAD_IMG)
         }
     }
@@ -287,7 +285,7 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
         init { itemView.setOnClickListener(this) }
 
         override fun onClick(v: View?) {
-            val imageUri = Uri.withAppendedPath(uriExternal, imagesIds[adapterPosition - 1].toString())
+            val imageUri = Uri.withAppendedPath(uriExternal, imagesIds[adapterPosition].toString())
             listener.onImageClick(imageUri)
             dismiss()
         }
@@ -310,7 +308,6 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
         override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
             return oldImages[oldItemPosition] == newImages[newItemPosition]
         }
-
     }
 
     /** callback for click on ViewHolder */
