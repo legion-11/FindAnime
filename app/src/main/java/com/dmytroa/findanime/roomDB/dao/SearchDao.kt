@@ -1,5 +1,6 @@
 package com.dmytroa.findanime.roomDB.dao
 
+import androidx.paging.PagingSource
 import androidx.room.*
 import com.dmytroa.findanime.dataClasses.roomDBEntity.SearchItem
 import kotlinx.coroutines.flow.Flow
@@ -21,5 +22,4 @@ interface SearchDao {
 
     @Query("SELECT * FROM searchItem ORDER BY id DESC")
     fun getAll(): Flow<Array<SearchItem>>
-
 }

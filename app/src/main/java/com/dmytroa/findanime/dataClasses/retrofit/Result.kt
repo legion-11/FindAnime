@@ -2,7 +2,7 @@ package com.dmytroa.findanime.dataClasses.retrofit
 
 data class Result(
     val anilist: Int,
-    val episode: Any,
+    val episode: Any?,
     val filename: String,
     val from: Double,
     val image: String,

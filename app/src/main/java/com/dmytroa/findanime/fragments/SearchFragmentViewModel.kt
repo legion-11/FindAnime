@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.*
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
 import com.dmytroa.findanime.dataClasses.retrofit.SearchByImageResult
 import com.dmytroa.findanime.dataClasses.roomDBEntity.SearchItem
 import com.dmytroa.findanime.repositories.LocalFilesRepository
@@ -21,6 +23,7 @@ import java.io.File
 class SearchFragmentViewModel(private val repository: LocalFilesRepository) : ViewModel() {
     private val searchService = RetrofitInstance.getInstance().create(SearchService::class.java)
     val items: LiveData<Array<SearchItem>> = repository.getAll().asLiveData()
+
     private val calls: MutableList<Pair<Call<*>, Long>> = mutableListOf()
 
     suspend fun insert(searchItem: SearchItem): Long = repository.insert(searchItem)
@@ -61,8 +64,11 @@ class SearchFragmentViewModel(private val repository: LocalFilesRepository) : Vi
             ) {
                 Log.i(TAG, "searchByImage.onResponse: ${response.body()?.result} ")
                 calls.remove(Pair(call, id))
+                Log.i(TAG, "updateSearchItemWithNewData: ${1} ")
                 val responseBody = response.body()
+                Log.i(TAG, "updateSearchItemWithNewData: ${2} ")
                 if (responseBody != null) {
+                    Log.i(TAG, "updateSearchItemWithNewData: ${3} ")
                     updateSearchItemWithNewData(responseBody, id, context)
                 } else {
                     Log.i(TAG, "searchByImage.onResponse: response.isUnsuccessful")
@@ -91,13 +97,16 @@ class SearchFragmentViewModel(private val repository: LocalFilesRepository) : Vi
                                             context: Context) {
         viewModelScope.launch {
             val mostSimilar = searchItemResult.result.firstOrNull()
+            Log.i(TAG, "updateSearchItemWithNewData: ${mostSimilar} ")
             mostSimilar?.let {
                 val newItem = repository.get(id).apply {
                     fileName = mostSimilar.filename
                     from = mostSimilar.from
-                    episode = mostSimilar.episode.toString()
+                    episode = mostSimilar.episode?.toString()
                     similarity = mostSimilar.similarity
                 }
+
+                Log.i(TAG, "updateSearchItemWithNewData: ${newItem} ")
                 repository.update(newItem)
 
                 getVideoPreview(mostSimilar.video, id, context)
