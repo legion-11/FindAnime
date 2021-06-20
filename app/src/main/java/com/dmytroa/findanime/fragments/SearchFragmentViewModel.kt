@@ -4,8 +4,6 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.*
-import androidx.paging.Pager
-import androidx.paging.PagingConfig
 import com.dmytroa.findanime.dataClasses.retrofit.SearchByImageResult
 import com.dmytroa.findanime.dataClasses.roomDBEntity.SearchItem
 import com.dmytroa.findanime.repositories.LocalFilesRepository
