@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
@@ -189,16 +190,13 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
                     fragment.setIsBookmarked(bookmarked)
                     true
                 }
-                android.R.id.home -> {
-                    fragment.unselectAll()
-                    mode?.finish()
-                    true
-                }
                 else -> false
             }
         }
 
         override fun onDestroyActionMode(mode: ActionMode?) {
+            val fragment = (supportFragmentManager.currentNavigationFragment as OnActionBarCallback)
+            fragment.unselectAll()
             mActionMode = null
         }
     }

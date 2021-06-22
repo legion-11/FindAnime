@@ -5,8 +5,6 @@ import android.graphics.drawable.Drawable
 import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
@@ -33,6 +31,7 @@ import com.dmytroa.findanime.R
 import com.dmytroa.findanime.dataClasses.roomDBEntity.SearchItem
 import com.dmytroa.findanime.databinding.FragmentSearchBinding
 import com.dmytroa.findanime.databinding.SearchItemsBinding
+import kotlinx.coroutines.*
 import java.io.File
 
 
@@ -44,7 +43,7 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
     private val binding get() = _binding!!
     private var _binding: FragmentSearchBinding? = null
     private lateinit var viewModel: SearchFragmentViewModel
-    private lateinit var searchAdapter: SearchItemAdapter
+    private var searchAdapter: SearchItemAdapter? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -66,11 +65,17 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        searchAdapter = SearchItemAdapter(arrayOf())
+
         binding.searchResultRecyclerView.layoutManager = LinearLayoutManager(context)
 
-        binding.searchResultRecyclerView.adapter = searchAdapter
         binding.searchResultRecyclerView.setHasFixedSize(true)
+        viewModel.items.observe(viewLifecycleOwner, {
+            if (searchAdapter == null) {
+                searchAdapter = SearchItemAdapter(it)
+                binding.searchResultRecyclerView.adapter = searchAdapter
+            }
+            searchAdapter?.updateDataset(it)
+        })
 
         binding.searchResultRecyclerView.addOnScrollListener( object :
             RecyclerView.OnScrollListener() {
@@ -96,10 +101,6 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
             }
         )
 
-        viewModel.items.observe(viewLifecycleOwner, {
-            searchAdapter.updateDataset(it)
-        })
-
 //        binding.button.setOnClickListener {
 //            val responseLiveData: LiveData<Response<Quota>> = liveData {
 //                val response = searchService.getQuota()
@@ -120,13 +121,13 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
         viewModel.createNewAnimeSearchRequest(imageUri, requireContext())
     }
 
-
     private fun showContextualActionBar(showMenu: Boolean, isBookmarked: Boolean) {
         (activity as MainActivity).showContextualActionBar(showMenu, isBookmarked)
     }
 
     override fun unselectAll() {
-        searchAdapter.unselectAll()
+        Log.i("TAG", "unselectAll: $searchAdapter")
+        searchAdapter?.unselectAll()
     }
 
     override fun setIsBookmarked(b: Boolean) {
@@ -199,9 +200,6 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
             val textContainer = binding.textContainer
             val root = binding.root
 
-            var runablePlay: Runnable? = null
-            var handler: Handler? = null
-
             init {
                 textContainer.layout = R.layout.default_text_layout
                 buttonsContainer.layout = R.layout.default_buttons_layout
@@ -209,7 +207,7 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
                 //resize to save aspect ratio
                 videoView.setOnPreparedListener { mp -> //Get your video's width and height
                     resizeVideo(mp)
-                    startVideoOnceItIsPrepared(mp)
+                    showVideoViewOnceVideoIsFullyPrepared(mp)
                 }
             }
 
@@ -240,26 +238,25 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
                 videoView.start()
             }
 
-            private fun startVideoOnceItIsPrepared(mp: MediaPlayer?) {
-                handler = Handler(Looper.getMainLooper())
-                runablePlay = Runnable {
-                    try {
-                        if (mp != null && mp.currentPosition > 0) {
-                            videoView.alpha = 1f
-                            thumbnailImageView.visibility = View.GONE
+            private fun showVideoViewOnceVideoIsFullyPrepared(mp: MediaPlayer?) {
+                CoroutineScope(Dispatchers.IO).launch {
+                    var started = false
+                    while (!started) {
+                        try {
+                            if (mp != null && mp.currentPosition > 0) {
+                                withContext(Dispatchers.Main) {
+                                    videoView.alpha = 1f
+                                    thumbnailImageView.visibility = View.GONE
+                                    started = true
+                                    return@withContext
+                                }
+                            }
+                            delay(10)
+                        } catch (e : IllegalStateException) {
+                            return@launch
                         }
-                        if (videoView.alpha == 1f) {
-                            runablePlay = null
-                            handler = null
-                        } else {
-                            handler?.postDelayed(runablePlay!!, 0)
-                        }
-                    } catch (e : IllegalStateException) {
-                        runablePlay = null
-                        handler = null
                     }
                 }
-                runablePlay?.let { handler?.post(it) }
             }
 
             private fun unVeilVideo() {
