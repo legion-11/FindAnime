@@ -11,4 +11,6 @@
     <!--  fragment_image_drawer_list_dialog.xml  -->
     <color name="drawer_background">@color/dark_background</color>
     <color name="drawer_toolbar_color">@color/dark_grey_on_dark_background</color>
+
+    <color name="colorPrimary">@color/purple_200</color>
 </resources>

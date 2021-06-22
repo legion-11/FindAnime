@@ -9,7 +9,10 @@ import android.util.Log
 import com.dmytroa.findanime.dataClasses.Album
 import com.dmytroa.findanime.roomDB.dao.SearchDao
 import com.dmytroa.findanime.dataClasses.roomDBEntity.SearchItem
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.launch
 import okhttp3.ResponseBody
 import java.io.BufferedOutputStream
 import java.io.File
@@ -20,11 +23,19 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
 
     suspend fun insert(searchItem: SearchItem): Long = searchDao.insert(searchItem)
 
-    suspend fun delete(searchItem: SearchItem) = searchDao.delete(searchItem)
+    fun delete(searchItem: SearchItem) =
+        CoroutineScope(Dispatchers.IO).launch{ searchDao.delete(searchItem) }
 
-    suspend fun update(searchItem: SearchItem) = searchDao.update(searchItem)
+    fun delete(id: Long) =
+        CoroutineScope(Dispatchers.IO).launch{ searchDao.delete(id) }
+
+    fun update(searchItem: SearchItem) =
+        CoroutineScope(Dispatchers.IO).launch{ searchDao.update(searchItem) }
 
     suspend fun get(id: Long): SearchItem = searchDao.get(id)
+
+    fun setIsBookmarked(id: Long, b: Boolean) =
+        CoroutineScope(Dispatchers.IO).launch{ searchDao.setIsBookmarked(id, b) }
 
     fun getAll(): Flow<Array<SearchItem>> = searchDao.getAll()
 

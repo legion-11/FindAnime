@@ -21,10 +21,17 @@ import java.io.File
 class SearchFragmentViewModel(private val repository: LocalFilesRepository) : ViewModel() {
     private val searchService = RetrofitInstance.getInstance().create(SearchService::class.java)
     val items: LiveData<Array<SearchItem>> = repository.getAll().asLiveData()
+    var selectedItemId: Long = -1
 
     private val calls: MutableList<Pair<Call<*>, Long>> = mutableListOf()
 
     suspend fun insert(searchItem: SearchItem): Long = repository.insert(searchItem)
+
+    fun setIsBookmarked(b: Boolean) = repository.setIsBookmarked(selectedItemId, b)
+
+    fun delete() = repository.delete(selectedItemId)
+
+    fun delete(searchItem: SearchItem) = repository.delete(searchItem)
 
     fun createNewAnimeSearchRequest(imageUri: Uri, context: Context) {
         viewModelScope.launch {
@@ -51,7 +58,7 @@ class SearchFragmentViewModel(private val repository: LocalFilesRepository) : Vi
 
     private suspend fun searchByImage(copyOfImageUri: String, id: Long, context: Context) {
         val body = prepareMultipart(copyOfImageUri)
-        while (calls.size != 0) { delay(1000) }
+        while (calls.size != 0) { delay(500) }
         val call = searchService.searchByImage(body)
         calls.add(Pair(call, id))
 
@@ -60,13 +67,10 @@ class SearchFragmentViewModel(private val repository: LocalFilesRepository) : Vi
                 call: Call<SearchByImageResult>,
                 response: Response<SearchByImageResult>
             ) {
-                Log.i(TAG, "searchByImage.onResponse: ${response.body()?.result} ")
+                Log.i(TAG, "searchByImage.onResponse: ${response.body()?.result?.get(0)} ")
                 calls.remove(Pair(call, id))
-                Log.i(TAG, "updateSearchItemWithNewData: ${1} ")
                 val responseBody = response.body()
-                Log.i(TAG, "updateSearchItemWithNewData: ${2} ")
                 if (responseBody != null) {
-                    Log.i(TAG, "updateSearchItemWithNewData: ${3} ")
                     updateSearchItemWithNewData(responseBody, id, context)
                 } else {
                     Log.i(TAG, "searchByImage.onResponse: response.isUnsuccessful")

@@ -13,6 +13,7 @@ data class SearchItem(
     var imageURI: String,
     var video: String?,
     var finished: Boolean,
+    var isBookmarked: Boolean = false,
     ){
     constructor(imageURI: String): this(0,null, null,null, null, imageURI, null, false)
 

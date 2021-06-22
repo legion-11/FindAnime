@@ -10,6 +10,9 @@ interface SearchDao {
     @Insert
     suspend fun insert(i: SearchItem): Long
 
+    @Query("DELETE FROM searchItem WHERE id=:id")
+    suspend fun delete(id: Long)
+
     @Delete
     suspend fun delete(i: SearchItem)
 
@@ -21,4 +24,7 @@ interface SearchDao {
 
     @Query("SELECT * FROM searchItem ORDER BY id DESC")
     fun getAll(): Flow<Array<SearchItem>>
+
+    @Query("UPDATE searchItem SET isBookmarked=:b WHERE id=:id")
+    suspend fun setIsBookmarked(id: Long, b: Boolean)
 }

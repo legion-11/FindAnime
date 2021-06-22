@@ -3,11 +3,15 @@
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_margin="8dp"
-    app:cardCornerRadius="16dp">
+    android:clickable="true"
+    android:focusable="true"
+    android:foreground="?android:attr/selectableItemBackground"
+    app:cardCornerRadius="16dp"
+    app:strokeColor="@color/search_item_stroke_color"
+    app:strokeWidth="2dp">
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/cardContainer"
@@ -16,31 +20,27 @@
         android:padding="8dp">
 
         <ImageButton
-            android:id="@+id/imageButton3"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            app:layout_constraintBottom_toTopOf="@+id/imageButton"
+            android:id="@+id/MALImageButton"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginTop="4dp"
+            android:adjustViewBounds="false"
+            android:background="@drawable/mal"
+            android:contentDescription="@string/open_on_my_anime_list"
+            android:scaleType="centerInside"
             app:layout_constraintEnd_toEndOf="parent"
-            app:srcCompat="@drawable/ic_baseline_share_24" />
+            app:layout_constraintTop_toBottomOf="@+id/shareImageButton" />
 
         <ImageButton
-            android:id="@+id/imageButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            app:layout_constraintBottom_toBottomOf="parent"
+            android:id="@+id/shareImageButton"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:adjustViewBounds="false"
+            android:contentDescription="@string/open_on_my_anime_list"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_baseline_share_24"
             app:layout_constraintEnd_toEndOf="parent"
-            app:srcCompat="@drawable/ic_baseline_share_24" />
-
-        <ImageView
-            android:id="@+id/originalImageView"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:contentDescription="image that user send"
-            app:layout_constraintDimensionRatio="16:9"
-            app:layout_constraintEnd_toEndOf="@+id/imageButton"
-            app:layout_constraintStart_toStartOf="@+id/imageButton"
-            app:layout_constraintTop_toTopOf="parent"
-            tools:srcCompat="@tools:sample/avatars" />
+            app:layout_constraintTop_toTopOf="@+id/nameTextView" />
 
         <TextView
             android:id="@+id/nameTextView"
@@ -51,7 +51,7 @@
             android:textColor="@color/theme_color_inverse"
             android:textSize="20sp"
             android:textStyle="bold"
-            app:layout_constraintEnd_toStartOf="@+id/buttonsContainer"
+            app:layout_constraintEnd_toStartOf="@+id/shareImageButton"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/videoContainer"
             tools:text="TextView" />
@@ -65,7 +65,6 @@
             app:layout_constraintTop_toBottomOf="@+id/nameTextView"
             tools:text="TextView" />
 
-
         <TextView
             android:id="@+id/episodeAndTimeTextView"
             android:layout_width="wrap_content"
@@ -75,22 +74,24 @@
             app:layout_constraintTop_toBottomOf="@+id/similarityTextView"
             tools:text="TextView" />
 
+
         <com.skydoves.androidveil.VeilLayout
             android:id="@+id/buttonsContainer"
             android:layout_width="0dp"
             android:layout_height="0dp"
-            app:layout_constraintBottom_toBottomOf="@+id/imageButton"
-            app:layout_constraintEnd_toEndOf="@+id/imageButton3"
-            app:layout_constraintStart_toStartOf="@+id/imageButton"
-            app:layout_constraintTop_toTopOf="@+id/imageButton3" />
+            app:layout_constraintBottom_toBottomOf="@+id/MALImageButton"
+            app:layout_constraintEnd_toEndOf="@+id/MALImageButton"
+            app:layout_constraintStart_toStartOf="@+id/MALImageButton"
+            app:layout_constraintTop_toTopOf="@+id/MALImageButton"
+            tools:visibility="gone" />
+
 
         <com.skydoves.androidveil.VeilLayout
             android:id="@+id/videoContainer"
             android:layout_width="0dp"
             android:layout_height="0dp"
-            android:layout_marginEnd="8dp"
             app:layout_constraintDimensionRatio="16:9"
-            app:layout_constraintEnd_toStartOf="@+id/originalImageView"
+            app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent">
 
@@ -118,12 +119,11 @@
         <com.skydoves.androidveil.VeilLayout
             android:id="@+id/textContainer"
             android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:layout_marginEnd="8dp"
-            app:layout_constraintBottom_toBottomOf="@+id/episodeAndTimeTextView"
-            app:layout_constraintEnd_toStartOf="@+id/originalImageView"
+            android:layout_height="wrap_content"
+            app:layout_constraintEnd_toEndOf="@+id/nameTextView"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/videoContainer" />
+            app:layout_constraintTop_toTopOf="@+id/nameTextView"
+            tools:visibility="gone" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 

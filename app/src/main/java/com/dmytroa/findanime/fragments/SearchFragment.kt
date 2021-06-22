@@ -2,6 +2,7 @@ package com.dmytroa.findanime.fragments
 
 
 import android.graphics.drawable.Drawable
+import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -38,10 +39,12 @@ import java.io.File
 /**
  * A simple [Fragment] subclass as the default destination in the navigation.
  */
-class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickListener {
+class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickListener,
+    MainActivity.OnActionBarCallback {
     private val binding get() = _binding!!
     private var _binding: FragmentSearchBinding? = null
     private lateinit var viewModel: SearchFragmentViewModel
+    private lateinit var searchAdapter: SearchItemAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -51,7 +54,6 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
                 (requireActivity().application as FindAnimeApplication).repository
             )
         ).get(SearchFragmentViewModel::class.java)
-
     }
 
     override fun onCreateView(
@@ -64,7 +66,7 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        val searchAdapter = SearchItemAdapter(arrayOf())
+        searchAdapter = SearchItemAdapter(arrayOf())
         binding.searchResultRecyclerView.layoutManager = LinearLayoutManager(context)
 
         binding.searchResultRecyclerView.adapter = searchAdapter
@@ -81,7 +83,8 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
                         }
                         SCROLL_STATE_IDLE -> {
                             // do not show button at the bottom position
-                            if (!recyclerView.canScrollVertically(1)) {
+                            if (!recyclerView.canScrollVertically(1) &&
+                                recyclerView.canScrollVertically(-1)) {
                                 (activity as MainActivity).hideFab()
                             } else {
                                 (activity as MainActivity).showFab()
@@ -96,6 +99,7 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
         viewModel.items.observe(viewLifecycleOwner, {
             searchAdapter.updateDataset(it)
         })
+
 //        binding.button.setOnClickListener {
 //            val responseLiveData: LiveData<Response<Quota>> = liveData {
 //                val response = searchService.getQuota()
@@ -116,9 +120,25 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
         viewModel.createNewAnimeSearchRequest(imageUri, requireContext())
     }
 
+
+    private fun showContextualActionBar(showMenu: Boolean, isBookmarked: Boolean) {
+        (activity as MainActivity).showContextualActionBar(showMenu, isBookmarked)
+    }
+
+    override fun unselectAll() {
+        searchAdapter.unselectAll()
+    }
+
+    override fun setIsBookmarked(b: Boolean) {
+        viewModel.setIsBookmarked(b)
+    }
+
+    override fun delete() {
+        viewModel.delete()
+    }
+
     private inner class SearchItemAdapter(private var items: Array<SearchItem>):
-        RecyclerView.Adapter<BaseViewHolder>() {
-        val TAG = "SearchItemAdapter"
+        RecyclerView.Adapter<SearchItemAdapter.BaseViewHolder>() {
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): BaseViewHolder {
             return ViewHolder(SearchItemsBinding.inflate(
@@ -131,7 +151,7 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
         }
 
         override fun onViewDetachedFromWindow(holder: BaseViewHolder) {
-            Log.i(TAG, "onViewDetachedFromWindow: ")
+            Log.i("SearchItemAdapter", "onViewDetachedFromWindow: ")
             holder as ViewHolder
             holder.thumbnailImageView.visibility = View.VISIBLE
             holder.videoView.apply {
@@ -142,7 +162,6 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
             }
             super.onViewDetachedFromWindow(holder)
         }
-
 
         override fun getItemCount(): Int {
             return items.size
@@ -157,53 +176,44 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
             if (needScroll) {binding.searchResultRecyclerView.smoothScrollToPosition(0)}
         }
 
-    }
-
-    private inner class SearchItemDiffCallback(var oldImages: Array<SearchItem>,
-                                               var newImages: Array<SearchItem>
-    ): DiffUtil.Callback() {
-        override fun getOldListSize(): Int {
-            return oldImages.size
+        fun unselectAll() {
+            val lastSelected = viewModel.selectedItemId
+            viewModel.selectedItemId = -1
+            notifyItemChanged(items.indexOfFirst { it.id == lastSelected })
         }
 
-        override fun getNewListSize(): Int {
-            return newImages.size
-        }
+        //just in case I will do some other viewHolders
+        private abstract inner class BaseViewHolder(binding: ViewBinding):
+            RecyclerView.ViewHolder(binding.root)
 
-        override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
-            return oldImages[oldItemPosition].id == newImages[newItemPosition].id
-        }
 
-        override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
-            return oldImages[oldItemPosition] == newImages[newItemPosition]
-        }
-    }
+        private inner class ViewHolder(binding: SearchItemsBinding):
+            BaseViewHolder(binding) {
 
-    //just in case I will do some other viewHolders
-    private abstract inner class BaseViewHolder(binding: ViewBinding): RecyclerView.ViewHolder(binding.root)
+            val fileNameTV: TextView = binding.nameTextView
+            val similarityTV: TextView = binding.similarityTextView
+            val videoView: VideoView = binding.videoView
+            val thumbnailImageView: ImageView = binding.thumbnailImageView
+            val videoContainer = binding.videoContainer
+            val buttonsContainer = binding.buttonsContainer
+            val textContainer = binding.textContainer
+            val root = binding.root
 
-    private inner class ViewHolder(binding: SearchItemsBinding):
-        BaseViewHolder(binding) {
+            var runablePlay: Runnable? = null
+            var handler: Handler? = null
 
-        val originalImageView: ImageView = binding.originalImageView
-        val fileNameTV: TextView = binding.nameTextView
-        val similarityTV: TextView = binding.similarityTextView
-        val videoView: VideoView = binding.videoView
-        val thumbnailImageView: ImageView = binding.thumbnailImageView
-        val videoContainer = binding.videoContainer
-        val buttonsContainer = binding.buttonsContainer
-        val textContainer = binding.textContainer
+            init {
+                textContainer.layout = R.layout.default_text_layout
+                buttonsContainer.layout = R.layout.default_buttons_layout
 
-        var runablePlay: Runnable? = null
-        var handler: Handler? = null
+                //resize to save aspect ratio
+                videoView.setOnPreparedListener { mp -> //Get your video's width and height
+                    resizeVideo(mp)
+                    startVideoOnceItIsPrepared(mp)
+                }
+            }
 
-        init {
-            textContainer.layout = R.layout.default_text_layout
-            buttonsContainer.layout = R.layout.default_buttons_layout
-
-            //resize to save aspect ratio
-            videoView.setOnPreparedListener { mp -> //Get your video's width and height
-
+            private fun resizeVideo(mp: MediaPlayer){
                 val videoWidth = mp.videoWidth
                 val videoHeight = mp.videoHeight
 
@@ -228,14 +238,15 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
                 layoutParams.height = scaledHeight.toInt()
                 videoView.layoutParams = layoutParams
                 videoView.start()
+            }
 
-                //avoid black background
+            private fun startVideoOnceItIsPrepared(mp: MediaPlayer?) {
                 handler = Handler(Looper.getMainLooper())
                 runablePlay = Runnable {
                     try {
                         if (mp != null && mp.currentPosition > 0) {
                             videoView.alpha = 1f
-                            thumbnailImageView.visibility = View.INVISIBLE
+                            thumbnailImageView.visibility = View.GONE
                         }
                         if (videoView.alpha == 1f) {
                             runablePlay = null
@@ -248,25 +259,32 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
                         handler = null
                     }
                 }
-                handler!!.post(runablePlay!!)
+                runablePlay?.let { handler?.post(it) }
             }
-        }
 
-        fun bind(item: SearchItem) {
-            Glide.with(requireActivity()).load(item.imageURI).into(originalImageView)
-            if (!item.finished) { viewModel.repeatAnimeSearchRequest(item, requireContext()) }
+            private fun unVeilVideo() {
+                videoContainer.unVeil()
+                buttonsContainer.apply { unVeil(); visibility = View.GONE }
+            }
 
-            fileNameTV.text = item.fileName ?: "some text"
-            similarityTV.text = if(item.similarity != null) item.similarity.toString() else "some text"
+            private fun veilVideo() {
+                videoContainer.veil()
+                buttonsContainer.apply { veil(); visibility = View.VISIBLE }
+            }
 
-            Log.i("ViewHolder", "onBindViewHolder: ${item.video}")
+            private fun loadVideo(item: SearchItem) {
+                if (item.video == null) {
+                    veilVideo()
+                    thumbnailImageView.setImageDrawable(null)
+                    return
+                }
+                videoView.isFocusable = false
+                thumbnailImageView.bringToFront()
 
-            if (item.fileName != null) {textContainer.unVeil()} else {textContainer.veil()}
-
-            if(item.video != null) {
                 Glide.with(requireActivity())
                     .load(Uri.fromFile(File(item.video!!)))
                     .thumbnail(0.1f)
+                    //unveil video once loaded
                     .listener(object : RequestListener<Drawable> {
                         override fun onLoadFailed(
                             e: GlideException?,
@@ -274,8 +292,7 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
                             target: Target<Drawable>?,
                             isFirstResource: Boolean
                         ): Boolean {
-                            videoContainer.unVeil()
-                            buttonsContainer.unVeil()
+                            unVeilVideo()
                             return false
                         }
 
@@ -286,16 +303,19 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
                             dataSource: DataSource?,
                             isFirstResource: Boolean
                         ): Boolean {
-                            videoContainer.unVeil()
-                            buttonsContainer.unVeil()
+                            unVeilVideo()
                             return false
                         }
 
                     })
                     .into(thumbnailImageView)
 
-                videoView.isFocusable = false
+                thumbnailImageView.setOnLongClickListener { selectUnselectItem(item); true}
+
                 thumbnailImageView.setOnClickListener {
+                    Log.i("TAG", "bind: loading video ")
+                    videoView.setOnLongClickListener { selectUnselectItem(item); true}
+
                     videoView.setVideoURI(Uri.fromFile(File(item.video!!)))
                     videoView.setOnClickListener { videoView ->
                         videoView as VideoView
@@ -306,11 +326,59 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
                         }
                     }
                 }
-            } else {
-                videoContainer.veil()
-                buttonsContainer.veil()
-                thumbnailImageView.setImageDrawable(null)
             }
+
+            private fun selectUnselectItem(item: SearchItem) {
+                val lastSelected = viewModel.selectedItemId
+                unselectAll()
+                if (lastSelected != item.id) { viewModel.selectedItemId = item.id }
+
+                changeStrokeColor(item)
+                showContextualActionBar(viewModel.selectedItemId != -1L, item.isBookmarked)
+            }
+
+            private fun changeStrokeColor(item: SearchItem) {
+                root.isSelected = item.id == viewModel.selectedItemId
+            }
+
+            fun bind(item: SearchItem) {
+                if (!item.finished) { viewModel.repeatAnimeSearchRequest(item, requireContext()) }
+
+                fileNameTV.text = item.fileName ?: ""
+                similarityTV.text = if(item.similarity != null) item.similarity.toString() else ""
+
+                Log.i("ViewHolder", "onBindViewHolder: $item")
+                if (item.fileName != null) { textContainer.unVeil(); textContainer.visibility = View.GONE }
+                else { textContainer.veil(); textContainer.visibility = View.VISIBLE  }
+
+                changeStrokeColor(item)
+                loadVideo(item)
+                itemView.setOnClickListener { selectUnselectItem(item) }
+            }
+
+            //todo add delete with swipe
+            //todo add bookmark with swipe
+        }
+    }
+
+
+    private class SearchItemDiffCallback(
+        var oldImages: Array<SearchItem>,
+        var newImages: Array<SearchItem> ): DiffUtil.Callback() {
+        override fun getOldListSize(): Int {
+            return oldImages.size
+        }
+
+        override fun getNewListSize(): Int {
+            return newImages.size
+        }
+
+        override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+            return oldImages[oldItemPosition].id == newImages[newItemPosition].id
+        }
+
+        override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+            return oldImages[oldItemPosition] == newImages[newItemPosition]
         }
     }
 }

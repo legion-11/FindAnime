@@ -8,14 +8,19 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.view.ActionMode
+import androidx.appcompat.widget.Toolbar
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
 import com.dmytroa.findanime.fragments.ImageDrawerListDialogFragment
 import com.dmytroa.findanime.shared.SafeClickListener
+import com.google.android.material.appbar.AppBarLayout
+import com.google.android.material.appbar.AppBarLayout.LayoutParams.*
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.snackbar.Snackbar
+
 
 class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageClickListener {
 
@@ -23,11 +28,23 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
         get() = primaryNavigationFragment?.childFragmentManager?.fragments?.first()
 
     private lateinit var fab: FloatingActionButton
+    private lateinit var toolbar: Toolbar
+    private lateinit var appBar: AppBarLayout
+    private var mActionMode: ActionMode? = null
+    private lateinit var mActionModeCallback: MyActionModeCallback
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        setSupportActionBar(findViewById(R.id.toolbar))
+        val bookmarked = savedInstanceState?.getBoolean(BOOKMARKED_KEY)
+        mActionModeCallback = MyActionModeCallback(bookmarked)
+        showContextualActionBar(savedInstanceState?.getBoolean(CALL_ACTION_MODE) , bookmarked)
+
+        appBar = findViewById(R.id.appBar)
+        toolbar = findViewById(R.id.toolbar)
+        setSupportActionBar(toolbar)
+        supportActionBar?.setHomeButtonEnabled(true)
+        toolbar.setNavigationIcon(R.drawable.ic_baseline_menu_24)
 
         fab = findViewById(R.id.fab)
         fab.setOnSafeClickListener {
@@ -40,18 +57,6 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
                     .newInstance()
                     .show(supportFragmentManager, "dialog")
             }
-        }
-    }
-
-    fun hideFab() {
-        if (fab.isShown) {
-            fab.hide()
-        }
-    }
-
-    fun showFab() {
-        if(fab.isOrWillBeHidden) {
-            fab.show()
         }
     }
 
@@ -68,6 +73,32 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
         return when (item.itemId) {
             R.id.action_settings -> true
             else -> super.onOptionsItemSelected(item)
+        }
+    }
+
+    fun hideFab() {
+        if (fab.isShown) {
+            fab.hide()
+        }
+    }
+
+    fun showFab() {
+        if(fab.isOrWillBeHidden) {
+            fab.show()
+        }
+    }
+
+    fun showContextualActionBar(showMenuForSelection: Boolean?, isBookmarked: Boolean?) {
+        if (showMenuForSelection == null) return
+        if (showMenuForSelection) {
+            isBookmarked?.let { mActionModeCallback.bookmarked=it }
+            if (mActionMode != null) {
+                mActionModeCallback.setBookmarksButtonIcon()
+                return
+            }
+            mActionMode = startSupportActionMode(mActionModeCallback)
+        } else {
+            mActionMode?.finish()
         }
     }
 
@@ -89,9 +120,17 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
         }
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean(BOOKMARKED_KEY, mActionModeCallback.bookmarked)
+        outState.putBoolean(CALL_ACTION_MODE, mActionMode != null)
+        super.onSaveInstanceState(outState)
+
+    }
 
     companion object {
         const val REQUEST_PERMISSION = 100
+        const val BOOKMARKED_KEY = "bookmarked"
+        const val CALL_ACTION_MODE = "call action mode"
     }
 
     override fun onImageClick(imageUri: Uri) {
@@ -100,11 +139,73 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
         }
     }
 
-
     private fun View.setOnSafeClickListener(onSafeClick: (View) -> Unit) {
         val safeClickListener = SafeClickListener {
             onSafeClick(it)
         }
         setOnClickListener(safeClickListener)
+    }
+
+    private inner class MyActionModeCallback(bookmarked: Boolean?): ActionMode.Callback {
+        var bookmarked = bookmarked ?: false
+        private lateinit var bookmarkItem: MenuItem
+
+        fun setBookmarksButtonIcon(){
+            bookmarkItem.setIcon(
+                if (bookmarked)
+                    R.drawable.ic_baseline_bookmark_24
+                else
+                    R.drawable.ic_baseline_bookmark_border_24
+            )
+        }
+
+        override fun onCreateActionMode(mode: ActionMode?, menu: Menu): Boolean {
+            mode?.menuInflater?.inflate(R.menu.menu_for_selection, menu)
+            bookmarkItem = menu.findItem(R.id.action_bookmarks)
+            setBookmarksButtonIcon()
+            return true
+        }
+
+        override fun onPrepareActionMode(mode: ActionMode?, menu: Menu?): Boolean {
+            return false
+        }
+
+        override fun onActionItemClicked(mode: ActionMode?, item: MenuItem?): Boolean {
+            val fragment = (supportFragmentManager.currentNavigationFragment as OnActionBarCallback)
+            return when(item?.itemId) {
+                R.id.action_delete -> {
+                    fragment.delete()
+                    mode?.finish()
+                    true
+                }
+                R.id.action_see -> {
+                    //TODO
+                    mode?.finish()
+                    true
+                }
+                R.id.action_bookmarks -> {
+                    bookmarked = !bookmarked
+                    setBookmarksButtonIcon()
+                    fragment.setIsBookmarked(bookmarked)
+                    true
+                }
+                android.R.id.home -> {
+                    fragment.unselectAll()
+                    mode?.finish()
+                    true
+                }
+                else -> false
+            }
+        }
+
+        override fun onDestroyActionMode(mode: ActionMode?) {
+            mActionMode = null
+        }
+    }
+
+    interface OnActionBarCallback {
+        fun unselectAll()
+        fun setIsBookmarked(b: Boolean)
+        fun delete()
     }
 }
