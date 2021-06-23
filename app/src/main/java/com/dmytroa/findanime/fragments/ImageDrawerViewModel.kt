@@ -8,8 +8,8 @@ class ImageDrawerViewModel(private val albums: ArrayList<Album>,
                            allImagesStringLocalized: String) : ViewModel() {
 
     val albumNames = listOf(allImagesStringLocalized) + albums.sortedByDescending { it.imageIds.maxOrNull() }.map { it.name }
-
     private val _selectedGallery = MutableLiveData(allImagesStringLocalized)
+
     val images: LiveData<ArrayList<Long>> = Transformations.map(_selectedGallery) { str ->
         var selectedImages: ArrayList<Long> = arrayListOf()
         if (str == allImagesStringLocalized) {

@@ -8,6 +8,7 @@ import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.view.Window
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.view.ActionMode
 import androidx.appcompat.widget.Toolbar
@@ -40,11 +41,11 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
         val bookmarked = savedInstanceState?.getBoolean(BOOKMARKED_KEY)
         mActionModeCallback = MyActionModeCallback(bookmarked)
         showContextualActionBar(savedInstanceState?.getBoolean(CALL_ACTION_MODE) , bookmarked)
-
         appBar = findViewById(R.id.appBar)
         toolbar = findViewById(R.id.toolbar)
         setSupportActionBar(toolbar)
         supportActionBar?.setHomeButtonEnabled(true)
+        supportActionBar?.setDisplayShowTitleEnabled(false)
         toolbar.setNavigationIcon(R.drawable.ic_baseline_menu_24)
 
         fab = findViewById(R.id.fab)
@@ -72,7 +73,7 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
         // automatically handle clicks on the Home/Up button, so long
         // as you specify a parent activity in AndroidManifest.xml.
         return when (item.itemId) {
-            R.id.action_settings -> true
+            R.id.action_filter_bookmarks -> true
             else -> super.onOptionsItemSelected(item)
         }
     }
@@ -206,4 +207,5 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
         fun setIsBookmarked(b: Boolean)
         fun delete()
     }
+
 }

@@ -23,19 +23,23 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
 
     suspend fun insert(searchItem: SearchItem): Long = searchDao.insert(searchItem)
 
-    fun delete(searchItem: SearchItem) =
-        CoroutineScope(Dispatchers.IO).launch{ searchDao.delete(searchItem) }
-
-    fun delete(id: Long) =
-        CoroutineScope(Dispatchers.IO).launch{ searchDao.delete(id) }
+    fun delete(searchItem: SearchItem?) {
+        if (searchItem == null) return
+        CoroutineScope(Dispatchers.IO).launch{
+            searchDao.delete(searchItem)
+            deleteImage(searchItem.imageURI)
+//            deleteVideo(searchItem.video)
+        }
+    }
 
     fun update(searchItem: SearchItem) =
         CoroutineScope(Dispatchers.IO).launch{ searchDao.update(searchItem) }
 
     suspend fun get(id: Long): SearchItem = searchDao.get(id)
 
-    fun setIsBookmarked(id: Long, b: Boolean) =
-        CoroutineScope(Dispatchers.IO).launch{ searchDao.setIsBookmarked(id, b) }
+    fun setIsBookmarked(searchItem: SearchItem, b: Boolean) {
+        CoroutineScope(Dispatchers.IO).launch{ searchDao.setIsBookmarked(searchItem.id, b) }
+    }
 
     fun getAll(): Flow<Array<SearchItem>> = searchDao.getAll()
 
@@ -100,7 +104,7 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
             return albums
         }
 
-        /** TODO make it suspend
+        /**
          * copy image to internal storage and send path to new file
          **/
         fun copyImageToInternalStorage(imageUri: Uri, context: Context?): String? {
@@ -156,4 +160,18 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
             return null
         }
     }
+
+    private fun deleteVideo(video: String?) {
+        if (video == null) return
+        val myFile = File(video)
+        Log.i(TAG, "deleteVideo: ${myFile.exists()}")
+        if (myFile.exists()) myFile.delete()
+    }
+
+    fun deleteImage(imageURI: String) {
+        val myFile = File(imageURI)
+        Log.i(TAG, "deleteImage: ${myFile.exists()}")
+        if (myFile.exists()) myFile.delete()
+    }
+
 }

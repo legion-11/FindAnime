@@ -1,10 +1,11 @@
 package com.dmytroa.findanime.fragments
 
-
 import android.graphics.drawable.Drawable
 import android.media.MediaPlayer
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.util.DisplayMetrics
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
@@ -12,9 +13,11 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.VideoView
+import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.RecyclerView.SCROLL_STATE_DRAGGING
@@ -31,6 +34,7 @@ import com.dmytroa.findanime.R
 import com.dmytroa.findanime.dataClasses.roomDBEntity.SearchItem
 import com.dmytroa.findanime.databinding.FragmentSearchBinding
 import com.dmytroa.findanime.databinding.SearchItemsBinding
+import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.*
 import java.io.File
 
@@ -44,6 +48,64 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
     private var _binding: FragmentSearchBinding? = null
     private lateinit var viewModel: SearchFragmentViewModel
     private var searchAdapter: SearchItemAdapter? = null
+
+    private val simpleCallback = object : ItemTouchHelper.SimpleCallback(
+        0, ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT) {
+
+        override fun onMove(
+            recyclerView: RecyclerView,
+            viewHolder: RecyclerView.ViewHolder,
+            target: RecyclerView.ViewHolder
+        ): Boolean {
+            return false
+        }
+
+        override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
+            val position = viewHolder.bindingAdapterPosition
+
+            when(direction) {
+                ItemTouchHelper.LEFT -> {
+                    searchAdapter?.notifyItemChanged(position)
+                }
+                ItemTouchHelper.RIGHT -> {
+                    val deletedItem = searchAdapter?.deleteItem(position)
+                    deletedItem?.let {
+                        if (!deletedItem.finished) return@let
+                        Snackbar.make(binding.searchResultRecyclerView, it.fileName ?: "", Snackbar.LENGTH_LONG)
+                            .setAction("UNDO") {
+                                viewModel.launchInsert(deletedItem)
+                            }
+                            .show()
+                    }
+
+                }
+            }
+        }
+
+    }
+
+    private val onScrollListener = object : RecyclerView.OnScrollListener() {
+
+        override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+            super.onScrollStateChanged(recyclerView, newState)
+            Log.i("TAG", "onScrollStateChanged: $newState ")
+            when(newState) {
+                SCROLL_STATE_DRAGGING -> {
+                    (activity as MainActivity).hideFab()
+                }
+                SCROLL_STATE_IDLE -> {
+                    // do not show button at the bottom position
+                    if (!recyclerView.canScrollVertically(1) &&
+                        recyclerView.canScrollVertically(-1)) {
+                        (activity as MainActivity).hideFab()
+                    } else {
+                        (activity as MainActivity).showFab()
+                    }
+                }
+                else -> {}
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -69,6 +131,9 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
         binding.searchResultRecyclerView.layoutManager = LinearLayoutManager(context)
 
         binding.searchResultRecyclerView.setHasFixedSize(true)
+        val itemTouchHelper = ItemTouchHelper(simpleCallback)
+        itemTouchHelper.attachToRecyclerView(binding.searchResultRecyclerView)
+
         viewModel.items.observe(viewLifecycleOwner, {
             if (searchAdapter == null) {
                 searchAdapter = SearchItemAdapter(it)
@@ -77,29 +142,7 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
             searchAdapter?.updateDataset(it)
         })
 
-        binding.searchResultRecyclerView.addOnScrollListener( object :
-            RecyclerView.OnScrollListener() {
-                override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
-                    super.onScrollStateChanged(recyclerView, newState)
-                    Log.i("TAG", "onScrollStateChanged: $newState ")
-                    when(newState) {
-                        SCROLL_STATE_DRAGGING -> {
-                            (activity as MainActivity).hideFab()
-                        }
-                        SCROLL_STATE_IDLE -> {
-                            // do not show button at the bottom position
-                            if (!recyclerView.canScrollVertically(1) &&
-                                recyclerView.canScrollVertically(-1)) {
-                                (activity as MainActivity).hideFab()
-                            } else {
-                                (activity as MainActivity).showFab()
-                            }
-                        }
-                        else -> {}
-                    }
-                }
-            }
-        )
+        binding.searchResultRecyclerView.addOnScrollListener(onScrollListener)
 
 //        binding.button.setOnClickListener {
 //            val responseLiveData: LiveData<Response<Quota>> = liveData {
@@ -112,11 +155,8 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
 //                }
 //            }
 //        }
-
-//        view.findViewById<Button>(R.id.button_first).setOnClickListener {
-//            findNavController().navigate(R.id.action_FirstFragment_to_SecondFragment)
-//        }
     }
+
     override fun onImageClick(imageUri: Uri) {
         viewModel.createNewAnimeSearchRequest(imageUri, requireContext())
     }
@@ -125,8 +165,11 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
         (activity as MainActivity).showContextualActionBar(showMenu, isBookmarked)
     }
 
+    override fun delete() {
+        searchAdapter?.deleteItem()
+    }
+
     override fun unselectAll() {
-        Log.i("TAG", "unselectAll: $searchAdapter")
         searchAdapter?.unselectAll()
     }
 
@@ -134,16 +177,39 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
         viewModel.setIsBookmarked(b)
     }
 
-    override fun delete() {
-        viewModel.delete()
+    fun getStatusBarHeight(): Int {
+        val resourceId = resources.getIdentifier("status_bar_height", "dimen", "android")
+        return if (resourceId > 0) {
+            resources.getDimensionPixelSize(resourceId)
+        } else 0
     }
+
+    private fun getDisplayMetrics(): DisplayMetrics {
+        val outMetrics = DisplayMetrics()
+         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val display = activity?.display
+            display?.getRealMetrics(outMetrics)
+        } else {
+            @Suppress("DEPRECATION")
+            val display = activity?.windowManager?.defaultDisplay
+            @Suppress("DEPRECATION")
+            display?.getMetrics(outMetrics)
+        }
+        return outMetrics
+    }
+
 
     private inner class SearchItemAdapter(private var items: Array<SearchItem>):
         RecyclerView.Adapter<SearchItemAdapter.BaseViewHolder>() {
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): BaseViewHolder {
-            return ViewHolder(SearchItemsBinding.inflate(
-                LayoutInflater.from(parent.context), parent, false))
+            val itemView = SearchItemsBinding.inflate(
+                LayoutInflater.from(parent.context), parent, false)
+            val params = itemView.videoContainer.layoutParams as ConstraintLayout.LayoutParams
+            val height = getDisplayMetrics().heightPixels
+            params.matchConstraintMaxHeight = height - getStatusBarHeight() - 10
+            itemView.videoContainer.layoutParams = params
+            return ViewHolder(itemView)
         }
 
         override fun onBindViewHolder(holder: BaseViewHolder, position: Int) {
@@ -168,6 +234,21 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
             return items.size
         }
 
+        fun deleteItem(searchItem: SearchItem? = viewModel.selectedItem) {
+            if (searchItem == null) return
+            val newItems = items.toCollection(mutableListOf())
+            newItems.remove(searchItem)
+            updateDataset(newItems.toTypedArray())
+            viewModel.delete(searchItem)
+        }
+
+        fun deleteItem(position: Int): SearchItem? {
+            if (position < 0 || position > items.size - 1) return null
+            val item = items[position]
+            deleteItem(item)
+            return item
+        }
+
         fun updateDataset(newDataset : Array<SearchItem>) {
             val oldItems = items
             val diffResult = DiffUtil.calculateDiff(SearchItemDiffCallback(oldItems, newDataset))
@@ -178,18 +259,20 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
         }
 
         fun unselectAll() {
-            val lastSelected = viewModel.selectedItemId
-            viewModel.selectedItemId = -1
-            notifyItemChanged(items.indexOfFirst { it.id == lastSelected })
+            val lastSelected = viewModel.selectedItem
+            viewModel.selectedItem = null
+            notifyItemChanged(items.indexOfFirst { it.id == lastSelected?.id })
         }
+
+
+
 
         //just in case I will do some other viewHolders
         private abstract inner class BaseViewHolder(binding: ViewBinding):
             RecyclerView.ViewHolder(binding.root)
 
-
         private inner class ViewHolder(binding: SearchItemsBinding):
-            BaseViewHolder(binding) {
+            BaseViewHolder(binding), View.OnClickListener, View.OnLongClickListener {
 
             val fileNameTV: TextView = binding.nameTextView
             val similarityTV: TextView = binding.similarityTextView
@@ -281,7 +364,7 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
                 Glide.with(requireActivity())
                     .load(Uri.fromFile(File(item.video!!)))
                     .thumbnail(0.1f)
-                    //unveil video once loaded
+                    //unveil video once image is loaded
                     .listener(object : RequestListener<Drawable> {
                         override fun onLoadFailed(
                             e: GlideException?,
@@ -301,41 +384,32 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
                             isFirstResource: Boolean
                         ): Boolean {
                             unVeilVideo()
+                            Log.i("SearchItemAdapter", "onCreateViewHolder: ${videoContainer.height}")
                             return false
                         }
 
                     })
                     .into(thumbnailImageView)
 
-                thumbnailImageView.setOnLongClickListener { selectUnselectItem(item); true}
-
-                thumbnailImageView.setOnClickListener {
-                    Log.i("TAG", "bind: loading video ")
-                    videoView.setOnLongClickListener { selectUnselectItem(item); true}
-
-                    videoView.setVideoURI(Uri.fromFile(File(item.video!!)))
-                    videoView.setOnClickListener { videoView ->
-                        videoView as VideoView
-                        if (videoView.isPlaying) {
-                            videoView.pause()
-                        } else {
-                            videoView.start()
-                        }
-                    }
-                }
+                thumbnailImageView.setOnLongClickListener(this@ViewHolder)
+                videoView.setOnLongClickListener(this@ViewHolder)
+                thumbnailImageView.setOnClickListener(this@ViewHolder)
+                videoView.setOnClickListener(this@ViewHolder)
             }
 
             private fun selectUnselectItem(item: SearchItem) {
-                val lastSelected = viewModel.selectedItemId
-                unselectAll()
-                if (lastSelected != item.id) { viewModel.selectedItemId = item.id }
+                val lastSelected = viewModel.selectedItem
+                if (lastSelected?.id != item.id) {
+                    unselectAll()
+                    viewModel.selectedItem = item
+                } else { viewModel.selectedItem = null }
 
                 changeStrokeColor(item)
-                showContextualActionBar(viewModel.selectedItemId != -1L, item.isBookmarked)
+                showContextualActionBar(viewModel.selectedItem != null, item.isBookmarked)
             }
 
             private fun changeStrokeColor(item: SearchItem) {
-                root.isSelected = item.id == viewModel.selectedItemId
+                root.isSelected = item.id == viewModel.selectedItem?.id
             }
 
             fun bind(item: SearchItem) {
@@ -350,13 +424,49 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
 
                 changeStrokeColor(item)
                 loadVideo(item)
-                itemView.setOnClickListener { selectUnselectItem(item) }
+                itemView.setOnClickListener(this)
+            }
+
+            override fun onClick(v: View?) {
+                val item = items[bindingAdapterPosition]
+                when(v) {
+                    itemView -> selectUnselectItem(item)
+                    thumbnailImageView -> {
+                        Log.i("TAG", "bind: loading video ")
+                        item.video?.let { videoView.setVideoURI(Uri.fromFile(File(it))) }
+                    }
+                    videoView -> {
+                        if (videoView.isPlaying) { videoView.pause() }
+                        else { videoView.start() }
+                    }
+                    else -> {}
+                }
+            }
+
+            override fun onLongClick(v: View?): Boolean {
+                return when(v) {
+                    thumbnailImageView -> {
+                        root.performClick()
+                        root.isPressed = true
+                        root.isPressed = false
+                        true
+                    }
+                    videoView -> {
+                        root.performClick()
+                        root.isPressed = true
+                        root.isPressed = false
+                        true
+                    }
+                    else -> {false}
+                }
             }
 
             //todo add delete with swipe
             //todo add bookmark with swipe
         }
     }
+
+
 
 
     private class SearchItemDiffCallback(

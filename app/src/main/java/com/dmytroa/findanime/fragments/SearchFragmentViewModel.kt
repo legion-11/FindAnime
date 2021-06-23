@@ -21,17 +21,31 @@ import java.io.File
 class SearchFragmentViewModel(private val repository: LocalFilesRepository) : ViewModel() {
     private val searchService = RetrofitInstance.getInstance().create(SearchService::class.java)
     val items: LiveData<Array<SearchItem>> = repository.getAll().asLiveData()
-    var selectedItemId: Long = -1
+    var selectedItem: SearchItem? = null
 
     private val calls: MutableList<Pair<Call<*>, Long>> = mutableListOf()
 
     suspend fun insert(searchItem: SearchItem): Long = repository.insert(searchItem)
 
-    fun setIsBookmarked(b: Boolean) = repository.setIsBookmarked(selectedItemId, b)
+    fun launchInsert(searchItem: SearchItem){
+        viewModelScope.launch {
+            insert(searchItem)
+            //todo return video
+        }
+    }
 
-    fun delete() = repository.delete(selectedItemId)
+    fun setIsBookmarked(b: Boolean, searchItem: SearchItem? = selectedItem) {
+        searchItem?.let { repository.setIsBookmarked(it, b) }
+    }
 
-    fun delete(searchItem: SearchItem) = repository.delete(searchItem)
+    fun delete(searchItem: SearchItem? = selectedItem) {
+        Log.i(TAG, "delete: $searchItem")
+        searchItem?.let {
+            Log.i(TAG, "delete: try to cancel")
+            cancelCall(searchItem.id)
+            repository.delete(searchItem)
+        }
+    }
 
     fun createNewAnimeSearchRequest(imageUri: Uri, context: Context) {
         viewModelScope.launch {
@@ -99,7 +113,7 @@ class SearchFragmentViewModel(private val repository: LocalFilesRepository) : Vi
                                             context: Context) {
         viewModelScope.launch {
             val mostSimilar = searchItemResult.result.firstOrNull()
-            Log.i(TAG, "updateSearchItemWithNewData: ${mostSimilar} ")
+            Log.i(TAG, "updateSearchItemWithNewData: $mostSimilar ")
             mostSimilar?.let {
                 val newItem = repository.get(id).apply {
                     fileName = mostSimilar.filename
@@ -108,7 +122,7 @@ class SearchFragmentViewModel(private val repository: LocalFilesRepository) : Vi
                     similarity = mostSimilar.similarity
                 }
 
-                Log.i(TAG, "updateSearchItemWithNewData: ${newItem} ")
+                Log.i(TAG, "updateSearchItemWithNewData: $newItem ")
                 repository.update(newItem)
 
                 getVideoPreview(mostSimilar.video, id, context)
@@ -122,7 +136,7 @@ class SearchFragmentViewModel(private val repository: LocalFilesRepository) : Vi
         calls.add(Pair(call, id))
 
         call.enqueue(object : Callback<ResponseBody> {
-            override  fun onResponse(
+            override fun onResponse(
                 call: Call<ResponseBody>,
                 response: Response<ResponseBody>
             ) {
@@ -132,6 +146,9 @@ class SearchFragmentViewModel(private val repository: LocalFilesRepository) : Vi
                     val fileUri = LocalFilesRepository.saveVideo(responseBody, context)
                     if (fileUri != null) {
                         updateSearchItemWithVideo(fileUri, id)
+                        CoroutineScope(Dispatchers.IO).launch {
+                            repository.deleteImage(repository.get(id).imageURI)
+                        }
                     }
                 } else {
                     Log.i(TAG, "getVideoPreview: response.isUnsuccessful")
@@ -163,6 +180,7 @@ class SearchFragmentViewModel(private val repository: LocalFilesRepository) : Vi
         for (pair in calls){
             if (pair.second == id) {
                 pair.first.cancel()
+                Log.i(TAG, "cancelCall: call canceled")
                 calls.remove(pair)
                 break
             }

@@ -14,4 +14,8 @@
     <string name="hello_second_fragment">Hello second fragment. Arg: %1$s</string>
     <string name="image_preview_from_gallery">image preview from gallery</string>
     <string name="open_on_my_anime_list">Open on My Anime List</string>
+    <string name="delete">Delete</string>
+    <string name="bookmark">Bookmark</string>
+    <string name="other_results">Other results</string>
+    <string name="filter_by_bookmark">Filter by bookmark</string>
 </resources>
