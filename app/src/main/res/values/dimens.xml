@@ -4,4 +4,6 @@
     <dimen name="list_item_spacing_half">8dp</dimen>
     <dimen name="resizable_view_min_height">12dp</dimen>
     <dimen name="resizable_view_handle_height">4dp</dimen>
+
+    <dimen name="item_touch_text_size">18sp</dimen>
 </resources>

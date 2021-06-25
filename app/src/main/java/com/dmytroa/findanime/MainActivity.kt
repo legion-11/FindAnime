@@ -4,11 +4,9 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
-import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
-import android.view.Window
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.view.ActionMode
 import androidx.appcompat.widget.Toolbar
@@ -38,9 +36,10 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        val bookmarked = savedInstanceState?.getBoolean(BOOKMARKED_KEY)
-        mActionModeCallback = MyActionModeCallback(bookmarked)
-        showContextualActionBar(savedInstanceState?.getBoolean(CALL_ACTION_MODE) , bookmarked)
+        mActionModeCallback = MyActionModeCallback()
+        savedInstanceState?.getBoolean(CALL_ACTION_MODE)?.let {
+            showContextualActionBar(it)
+        }
         appBar = findViewById(R.id.appBar)
         toolbar = findViewById(R.id.toolbar)
         setSupportActionBar(toolbar)
@@ -90,14 +89,9 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
         }
     }
 
-    fun showContextualActionBar(showMenuForSelection: Boolean?, isBookmarked: Boolean?) {
-        if (showMenuForSelection == null) return
+    fun showContextualActionBar(showMenuForSelection: Boolean) {
         if (showMenuForSelection) {
-            isBookmarked?.let { mActionModeCallback.bookmarked=it }
-            if (mActionMode != null) {
-                mActionModeCallback.setBookmarksButtonIcon()
-                return
-            }
+            if (mActionMode != null) return
             mActionMode = startSupportActionMode(mActionModeCallback)
         } else {
             mActionMode?.finish()
@@ -123,7 +117,6 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
-        outState.putBoolean(BOOKMARKED_KEY, mActionModeCallback.bookmarked)
         outState.putBoolean(CALL_ACTION_MODE, mActionMode != null)
         super.onSaveInstanceState(outState)
 
@@ -131,7 +124,6 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
 
     companion object {
         const val REQUEST_PERMISSION = 100
-        const val BOOKMARKED_KEY = "bookmarked"
         const val CALL_ACTION_MODE = "call action mode"
     }
 
@@ -148,23 +140,11 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
         setOnClickListener(safeClickListener)
     }
 
-    private inner class MyActionModeCallback(bookmarked: Boolean?): ActionMode.Callback {
-        var bookmarked = bookmarked ?: false
-        private lateinit var bookmarkItem: MenuItem
+    private inner class MyActionModeCallback : ActionMode.Callback {
 
-        fun setBookmarksButtonIcon(){
-            bookmarkItem.setIcon(
-                if (bookmarked)
-                    R.drawable.ic_baseline_bookmark_24
-                else
-                    R.drawable.ic_baseline_bookmark_border_24
-            )
-        }
 
         override fun onCreateActionMode(mode: ActionMode?, menu: Menu): Boolean {
             mode?.menuInflater?.inflate(R.menu.menu_for_selection, menu)
-            bookmarkItem = menu.findItem(R.id.action_bookmarks)
-            setBookmarksButtonIcon()
             return true
         }
 
@@ -173,10 +153,10 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
         }
 
         override fun onActionItemClicked(mode: ActionMode?, item: MenuItem?): Boolean {
-            val fragment = (supportFragmentManager.currentNavigationFragment as OnActionBarCallback)
+            val fragment = (supportFragmentManager.currentNavigationFragment as OnActionBarCallback?)
             return when(item?.itemId) {
                 R.id.action_delete -> {
-                    fragment.delete()
+                    fragment?.delete()
                     mode?.finish()
                     true
                 }
@@ -185,10 +165,8 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
                     mode?.finish()
                     true
                 }
-                R.id.action_bookmarks -> {
-                    bookmarked = !bookmarked
-                    setBookmarksButtonIcon()
-                    fragment.setIsBookmarked(bookmarked)
+                R.id.action_share -> {
+                    fragment?.share()
                     true
                 }
                 else -> false
@@ -204,7 +182,7 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
 
     interface OnActionBarCallback {
         fun unselectAll()
-        fun setIsBookmarked(b: Boolean)
+        fun share()
         fun delete()
     }
 

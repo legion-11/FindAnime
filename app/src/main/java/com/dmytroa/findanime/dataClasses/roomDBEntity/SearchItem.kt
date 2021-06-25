@@ -6,16 +6,18 @@ import androidx.room.PrimaryKey
 @Entity
 data class SearchItem(
     @PrimaryKey(autoGenerate = true) var id: Long,
-    var fileName: String?,
-    var episode: String?,
-    var from: Double?,
-    var similarity: Double?,
-    var imageURI: String,
-    var video: String?,
-    var finished: Boolean,
+    var imageURI: String?, //without filesDir + separator
+    var videoURI: String?, //without externalFilesDir + separator
+    var selectedResultId: Long?,
     var isBookmarked: Boolean = false,
     ){
-    constructor(imageURI: String): this(0,null, null,null, null, imageURI, null, false)
+    constructor(imageURI: String): this(0, imageURI,null, null, false)
+    val isFinished
+        get() = videoURI != null
+
+    override fun toString(): String {
+        return "SearchItem(id=$id, imageURI=$imageURI, videoURI=$videoURI, selectedResult=$selectedResultId, isBookmarked=$isBookmarked)"
+    }
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -24,31 +26,20 @@ data class SearchItem(
         other as SearchItem
 
         if (id != other.id) return false
-        if (fileName != other.fileName) return false
-        if (episode != other.episode) return false
-        if (from != other.from) return false
-        if (similarity != other.similarity) return false
         if (imageURI != other.imageURI) return false
-        if (video != other.video) return false
+        if (videoURI != other.videoURI) return false
+        if (selectedResultId != other.selectedResultId) return false
 
         return true
     }
 
     override fun hashCode(): Int {
         var result = id.hashCode()
-        result = 31 * result + (fileName?.hashCode() ?: 0)
-        result = 31 * result + (episode?.hashCode() ?: 0)
-        result = 31 * result + (from?.hashCode() ?: 0)
-        result = 31 * result + (similarity?.hashCode() ?: 0)
-        result = 31 * result + imageURI.hashCode()
-        result = 31 * result + (video?.hashCode() ?: 0)
+        result = 31 * result + (imageURI?.hashCode() ?: 0)
+        result = 31 * result + (videoURI?.hashCode() ?: 0)
+        result = 31 * result + (selectedResultId?.hashCode() ?: 0)
+        result = 31 * result + isBookmarked.hashCode()
         return result
     }
-
-    override fun toString(): String {
-        return "SearchItem(id=$id, fileName=$fileName, episode=$episode, from=$from," +
-                " similarity=$similarity, imageURI='$imageURI', video=$video)"
-    }
-
 
 }

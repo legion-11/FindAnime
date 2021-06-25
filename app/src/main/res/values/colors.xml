@@ -6,12 +6,18 @@
     <color name="teal_200">#FF03DAC5</color>
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
-    <color name="dark_on_dark">#121212</color>
     <color name="white">#FFFFFFFF</color>
     <color name="light_blue_400">#FF29B6F6</color>
     <color name="light_blue_600">#FF039BE5</color>
     <color name="gray_400">#FFBDBDBD</color>
     <color name="gray_600">#FF757575</color>
+
+
+    <color name="red_200">#CC6A6A</color>
+    <color name="red_700">#D32F2F</color>
+
+    <color name="yellow_200">#FFE082</color>
+    <color name="yellow_700">#FFA000</color>
 
     <color name="gray_for_dark_gallery">#BCBCBC</color>
     <color name="dark_background">#1B1B1B</color>
@@ -31,4 +37,8 @@
     <color name="drawer_toolbar_color">@color/grey_on_white_background</color>
 
     <color name="colorPrimary">@color/purple_500</color>
+
+    <color name="swipe_to_delete_bg">@color/red_700</color>
+    <color name="swipe_to_share_bg">@color/yellow_700</color>
+    <color name="material_card_default_color">#FFFFFF</color>
 </resources>

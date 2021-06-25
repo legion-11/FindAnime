@@ -7,4 +7,16 @@
         <item name="colorControlHighlight">@color/ripple_material_light</item>
         <item name="android:textColorSecondary">@color/black</item>
     </style>
+
+    <style name="Widget.Button.Toggle" parent="android:Widget">
+        <item name="android:background">@drawable/ic_toggle_bg</item>
+        <item name="android:disabledAlpha">?android:attr/disabledAlpha</item>
+    </style>
+
+    <style name="Widget.Button.Toggle.NoText"  parent="Widget.Button.Toggle">
+        <item name="android:buttonStyleToggle">@style/Widget.Button.Toggle</item>
+        <item name="android:textOn"></item>
+        <item name="android:textOff"></item>
+    </style>
+
 </resources>

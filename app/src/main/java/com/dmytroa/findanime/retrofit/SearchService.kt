@@ -1,7 +1,7 @@
 package com.dmytroa.findanime.retrofit
 
 import com.dmytroa.findanime.dataClasses.retrofit.Quota
-import com.dmytroa.findanime.dataClasses.retrofit.SearchByImageResult
+import com.dmytroa.findanime.dataClasses.retrofit.SearchByImageRequestResult
 import okhttp3.MultipartBody
 import okhttp3.ResponseBody
 import retrofit2.Call
@@ -12,14 +12,14 @@ import retrofit2.http.*
 interface SearchService {
 
     @Multipart
-    @POST("/search")
+    @POST("/search?anilistInfo")
     fun searchByImage(
-        @Part image: MultipartBody.Part): Call<SearchByImageResult>
+        @Part image: MultipartBody.Part) : Call<SearchByImageRequestResult>
 
     @GET("/me")
     suspend fun getQuota() : Response<Quota>
 
     @GET
     @Streaming
-    fun getVideoPreview(@Url url: String): Call<ResponseBody>
+    fun getVideoPreview(@Url url: String) : Call<ResponseBody>
 }

@@ -13,4 +13,8 @@
     <color name="drawer_toolbar_color">@color/dark_grey_on_dark_background</color>
 
     <color name="colorPrimary">@color/purple_200</color>
+
+    <color name="swipe_to_delete_bg">@color/red_200</color>
+    <color name="swipe_to_share_bg">@color/yellow_200</color>
+    <color name="material_card_default_color">#121212</color>
 </resources>

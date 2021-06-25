@@ -18,4 +18,6 @@
     <string name="bookmark">Bookmark</string>
     <string name="other_results">Other results</string>
     <string name="filter_by_bookmark">Filter by bookmark</string>
+    <string name="share">Share</string>
+    <string name="send_to">Send to</string>
 </resources>
