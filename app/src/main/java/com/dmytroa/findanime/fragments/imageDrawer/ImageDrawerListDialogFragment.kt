@@ -1,4 +1,4 @@
-package com.dmytroa.findanime.fragments
+package com.dmytroa.findanime.fragments.imageDrawer
 
 import android.animation.LayoutTransition
 import android.app.Activity.RESULT_OK

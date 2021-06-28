@@ -2,6 +2,8 @@ package com.dmytroa.findanime.dataClasses.roomDBEntity
 
 import androidx.room.Embedded
 import androidx.room.Relation
+import java.util.*
+import kotlin.math.min
 
 data class SearchItemWithSelectedResult(
     @Embedded val searchItem: SearchItem,
@@ -31,6 +33,21 @@ data class SearchItemWithSelectedResult(
         var result = searchItem.hashCode()
         result = 31 * result + searchResult.hashCode()
         return result
+    }
+
+    fun getName(): String {
+        return searchResult?.getName() ?: ""
+    }
+
+    fun getTextComparisonScore(str: String): Int {
+        val name = getName().lowercase(Locale.ROOT)
+        val comparableString = str.lowercase(Locale.ROOT)
+        var score = 0
+        for (i in 0 until min(comparableString.length, name.length)) {
+            if (str[i] == name[i]) score += 1
+            else break
+        }
+        return score
     }
 
 }

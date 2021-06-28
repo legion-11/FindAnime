@@ -1,10 +1,12 @@
-package com.dmytroa.findanime.fragments
+package com.dmytroa.findanime.fragments.search
 
+import android.app.Application
 import android.content.Context
 import android.net.Uri
 import android.os.Environment
 import android.util.Log
 import androidx.lifecycle.*
+import com.dmytroa.findanime.FindAnimeApplication
 import com.dmytroa.findanime.dataClasses.retrofit.SearchByImageRequestResult
 import com.dmytroa.findanime.dataClasses.roomDBEntity.SearchItem
 import com.dmytroa.findanime.dataClasses.roomDBEntity.SearchItemWithSelectedResult
@@ -24,44 +26,38 @@ import retrofit2.Callback
 import retrofit2.Response
 import java.io.File
 
-class SearchFragmentViewModel(private val repository: LocalFilesRepository) : ViewModel() {
+class SearchFragmentViewModel(application: Application) : AndroidViewModel(application) {
+
     private val searchService = RetrofitInstance.getInstance().create(SearchService::class.java)
+    private val repository: LocalFilesRepository = (application as FindAnimeApplication).repository
+
     val items: LiveData<Array<SearchItemWithSelectedResult>> = repository.getAll().asLiveData()
 
-    var selectedItem: SearchItemWithSelectedResult? = null
+    //not allowing enqueue more than 1 search call
     private val semaphore = Semaphore(1,0)
     private val calls: MutableList<Pair<Call<*>, Long>> = mutableListOf()
 
     suspend fun insert(searchItem: SearchItem): Long = repository.insert(searchItem)
 
-    fun launchInsert(searchItem: SearchItem){
-        viewModelScope.launch {
-            insert(searchItem)
-            //todo return video
-        }
+    fun delete(searchItem: SearchItem) {
+        Log.i(TAG, "delete: $searchItem")
+        cancelCall(searchItem.id)
+        repository.delete(searchItem, getApplication())
     }
 
     fun setIsBookmarked(b: Boolean, item: SearchItemWithSelectedResult) {
         repository.setIsBookmarked(item.searchItem, b)
     }
 
-    fun delete(searchItem: SearchItem, context: Context) {
-        Log.i(TAG, "delete: $searchItem")
-        Log.i(TAG, "delete: try to cancel")
-        cancelCall(searchItem.id)
-        repository.delete(searchItem, context)
-
-    }
-
-    fun createNewAnimeSearchRequest(imageUri: Uri, context: Context) {
+    fun createNewAnimeSearchRequest(imageUri: Uri) {
         viewModelScope.launch {
             Log.i(TAG, "createNewAnimeSearchRequest: ${calls.size}")
-            val imageCopyName = LocalFilesRepository.copyImageToInternalStorage(imageUri, context)
+            val imageCopyName = LocalFilesRepository.copyImageToInternalStorage(imageUri, getApplication())
             if (imageCopyName != null) {
                 val newItem = SearchItem(imageCopyName)
                 val newId = insert(newItem)
                 newItem.id = newId
-                searchByImage(imageCopyName, newItem, context)
+                searchByImage(imageCopyName, newItem)
             } else {
                 //https://stackoverflow.com/questions/53484781/android-mvvm-is-it-possible-to-display-a-message-toast-snackbar-etc-from-the
                 //show one time error message
@@ -69,25 +65,24 @@ class SearchFragmentViewModel(private val repository: LocalFilesRepository) : Vi
         }
     }
 
-    fun repeatAnimeSearchRequest(item: SearchItemWithSelectedResult, context: Context) {
+    fun repeatAnimeSearchRequest(item: SearchItemWithSelectedResult) {
         viewModelScope.launch {
             if (calls.map { it.second }.contains(item.searchItem.id)) return@launch
-            item.searchResult?.video?.let {
-                getVideoPreview(it, item.searchItem, context)
+            item.searchResult?.videoURL?.let {
+                getVideoPreview(it, item.searchItem)
             } ?: run {
-                item.searchItem.imageURI?.let {
-                    searchByImage(it, item.searchItem, context)
+                item.searchItem.imageFileName?.let {
+                    searchByImage(it, item.searchItem)
                 } ?: run {
-                    delete(item.searchItem, context)
+                    delete(item.searchItem)
                 }
             }
         }
     }
 
     private suspend fun searchByImage(copyOfImageUri: String,
-                                      searchItemToUpdate: SearchItem,
-                                      context: Context) {
-        val fullImageUri = getFullImageURI(copyOfImageUri, context)
+                                      searchItemToUpdate: SearchItem) {
+        val fullImageUri = getFullImageURI(copyOfImageUri)
         val body = prepareMultipart(fullImageUri)
         val call = searchService.searchByImage(body)
         calls.add(Pair(call, searchItemToUpdate.id))
@@ -103,7 +98,7 @@ class SearchFragmentViewModel(private val repository: LocalFilesRepository) : Vi
                 calls.remove(Pair(call, searchItemToUpdate.id))
                 val responseBody = response.body()
                 if (responseBody != null) {
-                    updateSearchItemWithNewData(responseBody, searchItemToUpdate, context)
+                    updateSearchItemWithNewData(responseBody, searchItemToUpdate)
                 } else {
                     Log.i(TAG, "searchByImage.onResponse: response.isUnsuccessful")
                 }
@@ -129,13 +124,12 @@ class SearchFragmentViewModel(private val repository: LocalFilesRepository) : Vi
     }
 
     private fun updateSearchItemWithNewData(searchByImageRequestResult: SearchByImageRequestResult,
-                                            searchItemToUpdate: SearchItem,
-                                            context: Context) {
+                                            searchItemToUpdate: SearchItem) {
         viewModelScope.launch {
             if (searchByImageRequestResult.error != "" || searchByImageRequestResult.result.isEmpty() )
-                repository.delete(searchItemToUpdate, context)
+                repository.delete(searchItemToUpdate, getApplication())
 
-            val listToInset = searchByImageRequestResult.result.map {
+            val listToInsert = searchByImageRequestResult.result.map {
                 SearchResult(
                     id = 0,
                     parentId = searchItemToUpdate.id,
@@ -148,24 +142,37 @@ class SearchFragmentViewModel(private val repository: LocalFilesRepository) : Vi
                     episode = it.episode,
                     from = it.from,
                     similarity = it.similarity,
-                    video = it.video
+                    videoURL = it.video,
+                    imageURL = it.image
                 )
             }
 
 
             searchItemToUpdate.apply {
-                selectedResultId = repository.insertAllAndReturnIdOfFirst(listToInset)
+                selectedResultId = repository.insertAllAndReturnIdOfFirst(listToInsert)
             }
             repository.update(searchItemToUpdate)
 
             CoroutineScope(Dispatchers.IO).launch {
-                repository.deleteImage(searchItemToUpdate.imageURI, context)
+                repository.deleteImage(searchItemToUpdate.imageFileName, getApplication())
             }
-            getVideoPreview(listToInset[0].video, searchItemToUpdate, context)
+            getVideoPreview(listToInsert[0].videoURL, searchItemToUpdate)
         }
     }
 
-    private fun getVideoPreview(url: String, searchItemToUpdate: SearchItem, context: Context){
+    fun replaceWithNewVideo(searchItemToUpdate: SearchItem, newSearchResult: SearchResult){
+        viewModelScope.launch {
+            searchItemToUpdate.videoFileName?.let {
+                repository.deleteVideo(it, getApplication())
+            }
+            searchItemToUpdate.selectedResultId = newSearchResult.id
+            searchItemToUpdate.videoFileName = null
+            repository.update(searchItemToUpdate)
+            getVideoPreview(newSearchResult.videoURL, searchItemToUpdate)
+        }
+    }
+
+    private fun getVideoPreview(url: String, searchItemToUpdate: SearchItem){
 
         val call = searchService.getVideoPreview(url)
         val callWithId = Pair(call, searchItemToUpdate.id)
@@ -179,8 +186,9 @@ class SearchFragmentViewModel(private val repository: LocalFilesRepository) : Vi
                 calls.remove(callWithId)
                 val responseBody = response.body()
                 if (responseBody != null) {
-                    val fileUri = LocalFilesRepository.saveVideo(responseBody, context)
+                    val fileUri = LocalFilesRepository.saveVideo(responseBody, getApplication())
                     if (fileUri != null) {
+
                         updateSearchItemWithVideo(searchItemToUpdate, fileUri)
                     } else {
                         Log.i(TAG, "getVideoPreview: cannot save video")
@@ -204,7 +212,7 @@ class SearchFragmentViewModel(private val repository: LocalFilesRepository) : Vi
     private fun updateSearchItemWithVideo(searchItemToUpdate: SearchItem, fileUri: String) {
         viewModelScope.launch {
             searchItemToUpdate.apply {
-                videoURI = fileUri
+                videoFileName = fileUri
             }
             repository.update(searchItemToUpdate)
         }
@@ -221,18 +229,20 @@ class SearchFragmentViewModel(private val repository: LocalFilesRepository) : Vi
         }
     }
 
-    fun getFullVideoURI(fileName: String, context: Context) =
-        context.getExternalFilesDir(Environment.DIRECTORY_MOVIES)
+    fun getFullVideoURI(fileName: String) =
+        getApplication<FindAnimeApplication>().applicationContext
+            .getExternalFilesDir(Environment.DIRECTORY_MOVIES)
             .toString() + File.separatorChar + fileName
 
-    private fun getFullImageURI(fileName: String, context: Context?) =
-        context?.filesDir.toString() + File.separatorChar + fileName
+    private fun getFullImageURI(fileName: String) =
+        getApplication<FindAnimeApplication>().applicationContext
+            .filesDir.toString() + File.separatorChar + fileName
 
-    class SearchFragmentViewModelFactory(private val repository: LocalFilesRepository) : ViewModelProvider.Factory {
+    class SearchFragmentViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(SearchFragmentViewModel::class.java)) {
                 @Suppress("UNCHECKED_CAST")
-                return SearchFragmentViewModel(repository) as T
+                return SearchFragmentViewModel(application) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class")
         }

@@ -1,30 +1,24 @@
-package com.dmytroa.findanime.fragments
+package com.dmytroa.findanime.fragments.search
 
 import android.content.ContentValues
-import android.content.Context
 import android.content.Intent
 import android.graphics.Canvas
 import android.graphics.drawable.Drawable
 import android.media.MediaPlayer
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
-import android.util.DisplayMetrics
 import android.util.Log
 import android.util.TypedValue
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
-import android.widget.ImageView
-import android.widget.TextView
-import android.widget.VideoView
+import android.view.*
+import android.widget.*
+import androidx.appcompat.view.ActionMode
 import androidx.constraintlayout.widget.ConstraintLayout
-import androidx.core.app.ShareCompat
 import androidx.core.content.ContextCompat
-import androidx.core.content.FileProvider
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.ViewModelProvider
+import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -44,21 +38,26 @@ import com.dmytroa.findanime.dataClasses.roomDBEntity.SearchItem
 import com.dmytroa.findanime.dataClasses.roomDBEntity.SearchItemWithSelectedResult
 import com.dmytroa.findanime.databinding.FragmentSearchBinding
 import com.dmytroa.findanime.databinding.SearchItemsBinding
-import com.google.android.material.snackbar.Snackbar
+import com.dmytroa.findanime.fragments.imageDrawer.ImageDrawerListDialogFragment
+import com.dmytroa.findanime.shared.SharedViewModel
+import com.dmytroa.findanime.shared.Utils
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 import it.xabaras.android.recyclerview.swipedecorator.RecyclerViewSwipeDecorator
 import kotlinx.coroutines.*
 import java.io.File
+import java.util.*
 
 
 /**
  * A simple [Fragment] subclass as the default destination in the navigation.
  */
-class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickListener,
-    MainActivity.OnActionBarCallback {
+class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickListener {
     private val binding get() = _binding!!
     private var _binding: FragmentSearchBinding? = null
     private lateinit var viewModel: SearchFragmentViewModel
+    private val sharedViewModel: SharedViewModel by activityViewModels()
     private var searchAdapter: SearchItemAdapter? = null
+    private lateinit var fab: FloatingActionButton
 
     private val simpleCallback = object : ItemTouchHelper.SimpleCallback(
         0, ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT) {
@@ -76,41 +75,20 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
 
             when(direction) {
                 ItemTouchHelper.LEFT -> {
-                    searchAdapter?.share(position)
+                    searchAdapter?.shareItem(position)
                     searchAdapter?.notifyItemChanged(position)
                 }
                 ItemTouchHelper.RIGHT -> {
                     val deletedItem = searchAdapter?.deleteItem(position)
-                    deletedItem?.let {
-                        if (!deletedItem.searchItem.isFinished) return@let
-                        Snackbar.make(binding.searchResultRecyclerView,
-                            it.searchResult?.fileName ?: "", Snackbar.LENGTH_LONG)
-                            .setAction("UNDO") {
-                                //todo
-//                                viewModel.launchInsert(deletedItem)
-                            }
-                            .show()
-                    }
                 }
             }
         }
 
-        override fun onChildDraw(
-            c: Canvas,
-            recyclerView: RecyclerView,
-            viewHolder: RecyclerView.ViewHolder,
-            dX: Float,
-            dY: Float,
-            actionState: Int,
-            isCurrentlyActive: Boolean
+        override fun onChildDraw(c: Canvas, recyclerView: RecyclerView,
+                                 viewHolder: RecyclerView.ViewHolder, dX: Float,
+                                 dY: Float, actionState: Int, isCurrentlyActive: Boolean
         ) {
-            RecyclerViewSwipeDecorator.Builder(
-                c,
-                recyclerView,
-                viewHolder,
-                dX,
-                dY,
-                actionState,
+            RecyclerViewSwipeDecorator.Builder(c, recyclerView, viewHolder, dX, dY, actionState,
                 isCurrentlyActive
             )
                 .addSwipeLeftBackgroundColor(ContextCompat.getColor(requireContext(), R.color.swipe_to_share_bg))
@@ -144,15 +122,15 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
             Log.i("TAG", "onScrollStateChanged: $newState ")
             when(newState) {
                 SCROLL_STATE_DRAGGING -> {
-                    (activity as MainActivity).hideFab()
+                    (requireActivity() as OnSearchFragmentListener).hideFab()
                 }
                 SCROLL_STATE_IDLE -> {
                     // do not show button at the bottom position
                     if (!recyclerView.canScrollVertically(1) &&
                         recyclerView.canScrollVertically(-1)) {
-                        (activity as MainActivity).hideFab()
+                        (requireActivity() as OnSearchFragmentListener).showFab()
                     } else {
-                        (activity as MainActivity).showFab()
+                        (requireActivity() as OnSearchFragmentListener).showFab()
                     }
                 }
                 else -> {}
@@ -160,110 +138,190 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
         }
     }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
+    private var mActionMode: ActionMode? = null
+    private val mActionModeCallback = object: ActionMode.Callback {
+        private var needUnselection = true
 
-        viewModel = ViewModelProvider(
-            requireActivity(),
-            SearchFragmentViewModel.SearchFragmentViewModelFactory(
-                (requireActivity().application as FindAnimeApplication).repository
-            )
-        ).get(SearchFragmentViewModel::class.java)
+        override fun onCreateActionMode(mode: ActionMode?, menu: Menu): Boolean {
+            mode?.menuInflater?.inflate(R.menu.menu_for_selection, menu)
+            return true
+        }
+
+        override fun onPrepareActionMode(mode: ActionMode?, menu: Menu?): Boolean {
+            return false
+        }
+
+        override fun onActionItemClicked(mode: ActionMode?, item: MenuItem?): Boolean {
+            return when(item?.itemId) {
+                R.id.action_delete -> {
+                    searchAdapter?.deleteItem()
+                    needUnselection = true
+                    mode?.finish()
+                    true
+                }
+                R.id.action_see -> {
+                    needUnselection = false
+                    mode?.finish()
+                    sharedViewModel.selectedItem?.searchResult?.let {
+                        findNavController()
+                            .navigate(R.id.action_SearchFragment_to_SeeOtherOptionsFragment)
+                    }
+                    true
+                }
+                R.id.action_share -> {
+                    searchAdapter?.shareItem()
+                    true
+                }
+                else -> false
+            }
+        }
+
+        override fun onDestroyActionMode(mode: ActionMode?) {
+            if (needUnselection){
+                searchAdapter?.unselectAll()
+            }
+            mActionMode = null
+        }
     }
 
-    override fun onCreateView(
-            inflater: LayoutInflater, container: ViewGroup?,
-            savedInstanceState: Bundle?
-    ): View {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        val application = requireActivity().application as FindAnimeApplication
+        viewModel = ViewModelProvider(
+            requireActivity(),
+            SearchFragmentViewModel.SearchFragmentViewModelFactory(application)
+        ).get(SearchFragmentViewModel::class.java)
+        Log.i("TAG", "onCreate2: $sharedViewModel")
+    }
+
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?,
+                              savedInstanceState: Bundle?): View {
         _binding = FragmentSearchBinding.inflate(inflater, container, false)
         return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        showContextualActionBar(sharedViewModel.selectedItem != null)
 
+        arguments?.getBoolean(MainActivity.KEY_INVOKE_VIDEO_REPLACEMENT)?.let {
+            if (sharedViewModel.selectedItem?.searchItem?.selectedResultId
+                != sharedViewModel.newSelectedResult.id) {
+                viewModel.replaceWithNewVideo(
+                    sharedViewModel.selectedItem!!.searchItem,
+                    sharedViewModel.newSelectedResult
+                )
+            }
+        }
+
+        (requireActivity() as OnSearchFragmentListener).setSearchFragmentFun()
         binding.searchResultRecyclerView.layoutManager = LinearLayoutManager(context)
-
         binding.searchResultRecyclerView.setHasFixedSize(true)
         val itemTouchHelper = ItemTouchHelper(simpleCallback)
         itemTouchHelper.attachToRecyclerView(binding.searchResultRecyclerView)
 
         viewModel.items.observe(viewLifecycleOwner, {
             if (searchAdapter == null) {
-
-                searchAdapter = SearchItemAdapter(it)
+                searchAdapter = SearchItemAdapter(it, Utils.getVisibleHeight(requireActivity()))
                 binding.searchResultRecyclerView.adapter = searchAdapter
+                return@observe
             }
-            searchAdapter?.updateDataset(it)
+            searchAdapter?.setFullDataset(it)
+        })
+
+        sharedViewModel.filterBookmarks.observe(viewLifecycleOwner, {
+            searchAdapter?.filter?.filter(sharedViewModel.filterText.value)
+        })
+
+        sharedViewModel.filterText.observe(viewLifecycleOwner, {
+            searchAdapter?.filter?.filter(it)
         })
 
         binding.searchResultRecyclerView.addOnScrollListener(onScrollListener)
+    }
 
-//        binding.button.setOnClickListener {
-//            val responseLiveData: LiveData<Response<Quota>> = liveData {
-//                val response = searchService.getQuota()
-//                emit(response)
-//            }
-//            responseLiveData.observe(viewLifecycleOwner) {
-//                if(it.isSuccessful) {
-//                    Log.i("TAG", "addElement: ${it.body()}")
-//                }
-//            }
-//        }
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
+    }
+
+    fun showContextualActionBar(showMenuForSelection: Boolean) {
+        if (showMenuForSelection) {
+            if (mActionMode != null) return
+            mActionMode = (requireActivity() as MainActivity).startSupportActionMode(mActionModeCallback)
+        } else {
+            mActionMode?.finish()
+        }
     }
 
     override fun onImageClick(imageUri: Uri) {
-        viewModel.createNewAnimeSearchRequest(imageUri, requireContext())
+        viewModel.createNewAnimeSearchRequest(imageUri)
     }
 
-    private fun showContextualActionBar(showMenu: Boolean) {
-        (activity as MainActivity).showContextualActionBar(showMenu)
-    }
+    // FileProvider's uri sends video as a file to telegram
+    // https://stackoverflow.com/a/63600425/15225582
+    private fun getVideoContentUri(videoFile: File): Uri? {
+        var uri: Uri? = null
+        val cursor = context?.contentResolver?.query(
+            MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+            arrayOf(MediaStore.Video.Media._ID),
+            MediaStore.Video.Media.DISPLAY_NAME + "=? ",
+            arrayOf(videoFile.name), null)
 
-    override fun delete() {
-        searchAdapter?.deleteItem()
-    }
-
-    override fun unselectAll() {
-        searchAdapter?.unselectAll()
-    }
-
-    override fun share() {
-        searchAdapter?.shareItem()
-    }
-
-    fun getStatusBarHeight(): Int {
-        val resourceId = resources.getIdentifier("status_bar_height", "dimen", "android")
-        return if (resourceId > 0) {
-            resources.getDimensionPixelSize(resourceId)
-        } else 0
-    }
-
-    fun getToolbarBarHeight(): Int {
-        val tv = TypedValue()
-        if (requireActivity().theme.resolveAttribute(android.R.attr.actionBarSize, tv, true)) {
-            return TypedValue.complexToDimensionPixelSize(tv.data, resources.displayMetrics)
+        if (cursor != null && cursor.moveToFirst()) {
+            val id = cursor.getInt(cursor.getColumnIndex(MediaStore.MediaColumns._ID))
+            val baseUri = Uri.parse("content://media/external/video/media")
+            uri = Uri.withAppendedPath(baseUri, "" + id)
+        } else if (videoFile.exists()) {
+            val values = ContentValues()
+            values.put(MediaStore.Video.Media.DISPLAY_NAME, videoFile.name)
+            uri = context?.contentResolver?.insert(
+                MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
         }
-        return 0
+
+        cursor?.close()
+        return uri
     }
 
-    private fun getDisplayMetrics(): DisplayMetrics {
-        val outMetrics = DisplayMetrics()
-         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val display = activity?.display
-            display?.getRealMetrics(outMetrics)
-        } else {
-            @Suppress("DEPRECATION")
-            val display = activity?.windowManager?.defaultDisplay
-            @Suppress("DEPRECATION")
-            display?.getMetrics(outMetrics)
+    fun openMal(idMal: Int) {
+        val url = "https://myanimelist.net/anime/$idMal"
+        val i = Intent(Intent.ACTION_VIEW)
+        i.data = Uri.parse(url)
+        startActivity(i)
+    }
+
+    fun shareViaIntent(fileName: String) {
+        val videoContentUri = getVideoContentUri(File(viewModel.getFullVideoURI(fileName)))
+        val shareIntent: Intent = Intent().apply {
+            action = Intent.ACTION_SEND
+            putExtra(
+                Intent.EXTRA_STREAM,
+                videoContentUri
+            )
+            type = "video/*"
         }
-        return outMetrics
+        startActivity(Intent.createChooser(shareIntent, resources.getText(R.string.send_to)))
     }
 
+    companion object {
+        const val REQUEST_PERMISSION = 100
+    }
 
-    private inner class SearchItemAdapter(private var items: Array<SearchItemWithSelectedResult>):
-        RecyclerView.Adapter<SearchItemAdapter.BaseViewHolder>() {
+    private inner class SearchItemAdapter(
+        private var allItems: Array<SearchItemWithSelectedResult>,
+        private val maxHeight: Int
+    ): RecyclerView.Adapter<SearchItemAdapter.BaseViewHolder>(), Filterable {
+
+        private var filteredItems: Array<SearchItemWithSelectedResult> = getFilteredArray(textFilter)
+
+        private var selectedItem get() = sharedViewModel.selectedItem
+            set(value) {
+                sharedViewModel.selectedItem = value
+            }
+
+        private val textFilter get() = sharedViewModel.filterText.value ?: ""
+        private val isBookmarksFiltered get() = sharedViewModel.filterBookmarks.value ?: false
+
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): BaseViewHolder {
             val itemView = SearchItemsBinding.inflate(
@@ -272,15 +330,8 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
             return ViewHolder(itemView)
         }
 
-        private fun setMaxHeightToVisibleHeightOfDeviceScreen(itemView: SearchItemsBinding) {
-            val params = itemView.videoContainer.layoutParams as ConstraintLayout.LayoutParams
-            val height = getDisplayMetrics().heightPixels
-            params.matchConstraintMaxHeight = height - getStatusBarHeight() - getToolbarBarHeight()
-            itemView.videoContainer.layoutParams = params
-        }
-
         override fun onBindViewHolder(holder: BaseViewHolder, position: Int) {
-            val item = items[position]
+            val item = filteredItems[position]
             (holder as ViewHolder).bind(item)
         }
 
@@ -297,112 +348,126 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
             super.onViewDetachedFromWindow(holder)
         }
 
-        override fun getItemCount(): Int {
-            return items.size
+        override fun getItemCount(): Int = filteredItems.size
+        private var needScroll = false
+        fun setFullDataset(newDataset : Array<SearchItemWithSelectedResult>) {
+            val oldItems = allItems
+            needScroll = allItems.size == filteredItems.size && oldItems.size < newDataset.size
+            allItems = newDataset
+            filter.filter(textFilter)
         }
 
-        fun deleteItem(item: SearchItemWithSelectedResult? = viewModel.selectedItem) {
-            item?.let {
-                val newItems = items.toCollection(mutableListOf())
-                newItems.remove(it)
-                updateDataset(newItems.toTypedArray())
-                viewModel.delete(it.searchItem, requireContext())
-            }
-        }
-        fun shareItem(item: SearchItemWithSelectedResult? = viewModel.selectedItem){
-            item?.searchItem?.videoURI?.let {
+        fun updateDataset(newDataset : Array<SearchItemWithSelectedResult>) {
+            val oldItems = filteredItems
+            filteredItems = newDataset
+            val diffResult = DiffUtil.calculateDiff(SearchItemDiffCallback(oldItems, newDataset))
+            diffResult.dispatchUpdatesTo(this)
 
-                val shareIntent: Intent = Intent().apply {
-                    action = Intent.ACTION_SEND
-                    putExtra(Intent.EXTRA_STREAM,
-                        getVideoContentUri(
-                            File(
-                                viewModel.getFullVideoURI(it, requireContext())
-                            )
-                        )
-                    )
-                    type = "video/*"
-                }
-
-                startActivity(Intent.createChooser(shareIntent, resources.getText(R.string.send_to)))
-
+            if (textFilter.isNotEmpty() || needScroll) {
+                needScroll = false
+                binding.searchResultRecyclerView.scrollToPosition(0)
+                // if you do not notify it takes focus from search view
+                if (textFilter.isNotEmpty()) { notifyDataSetChanged()}
             }
         }
 
-        fun getVideoContentUri(videoFile: File): Uri? {
-            var uri: Uri? = null
-            val cursor = context?.contentResolver?.query(
-                MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
-                arrayOf(MediaStore.Video.Media._ID),
-                MediaStore.Video.Media.DISPLAY_NAME + "=? ",
-                arrayOf(videoFile.name), null)
-
-            if (cursor != null && cursor.moveToFirst()) {
-                val id = cursor.getInt(cursor.getColumnIndex(MediaStore.MediaColumns._ID))
-                val baseUri = Uri.parse("content://media/external/video/media")
-                uri = Uri.withAppendedPath(baseUri, "" + id)
-            } else if (videoFile.exists()) {
-                val values = ContentValues()
-                values.put(MediaStore.Video.Media.DISPLAY_NAME, videoFile.name)
-                uri = context?.contentResolver?.insert(
-                    MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
-            }
-
-            cursor?.close()
-            return uri
-        }
-
-        fun shareItem(position: Int) {
-            if (position < 0 || position > items.size - 1) return
-            val item = items[position]
-            shareItem(item)
+        private fun setMaxHeightToVisibleHeightOfDeviceScreen(itemView: SearchItemsBinding) {
+            val params = itemView.videoContainer.layoutParams as ConstraintLayout.LayoutParams
+            params.matchConstraintMaxHeight = maxHeight
+            itemView.videoContainer.layoutParams = params
         }
 
         fun deleteItem(position: Int): SearchItemWithSelectedResult? {
-            if (position < 0 || position > items.size - 1) return null
-            val item = items[position]
+            if (position < 0 || position > filteredItems.size - 1) return null
+            val item = filteredItems[position]
             deleteItem(item)
             return item
         }
 
-        fun share(position: Int) {
-            if (position < 0 || position > items.size - 1) return
-            val item = items[position]
-
+        fun deleteItem(item: SearchItemWithSelectedResult? = selectedItem) {
+            item?.let {
+                val newItems = filteredItems.toCollection(mutableListOf())
+                newItems.remove(it)
+                setFullDataset(newItems.toTypedArray())
+                if (selectedItem?.searchItem?.id == item.searchItem.id) {selectedItem = null}
+                viewModel.delete(it.searchItem)
+            }
         }
 
-        fun updateDataset(newDataset : Array<SearchItemWithSelectedResult>) {
-            Log.i("ViewHolder", "updateDataset: $newDataset")
-            val oldItems = items
-            val diffResult = DiffUtil.calculateDiff(SearchItemDiffCallback(oldItems, newDataset))
-            val needScroll = oldItems.size < newDataset.size
-            items = newDataset
-            diffResult.dispatchUpdatesTo(this)
-            if (needScroll) {binding.searchResultRecyclerView.smoothScrollToPosition(0)}
+        fun shareItem(position: Int) {
+            if (position < 0 || position > filteredItems.size - 1) return
+            val item = filteredItems[position]
+            shareItem(item)
+        }
+
+        fun shareItem(item: SearchItemWithSelectedResult? = selectedItem){
+            item?.searchItem?.videoFileName?.let { shareViaIntent(it) }
         }
 
         fun unselectAll() {
-            val lastSelected = viewModel.selectedItem
-            viewModel.selectedItem = null
-            notifyItemChanged(items.indexOfFirst { it.searchItem.id == lastSelected?.searchItem?.id })
+            val lastSelected = selectedItem
+            selectedItem = null
+            notifyItemChanged(filteredItems.indexOfFirst { it.searchItem.id == lastSelected?.searchItem?.id })
+        }
+
+        private fun getFilteredArray(charSearch: String): Array<SearchItemWithSelectedResult> {
+            val firstFilter = if (charSearch.isEmpty()) {
+                allItems
+            } else {
+                allItems.sortedWith(compareReversed(charSearch)).toTypedArray()
+            }
+            return if (!isBookmarksFiltered) {
+                firstFilter
+            } else {
+                val filteredListParent = arrayListOf<SearchItemWithSelectedResult>()
+                for (item in firstFilter) {
+                    if (item.searchItem.isBookmarked) {
+                        filteredListParent.add(item)
+                    }
+                }
+                filteredListParent.toTypedArray()
+            }
+        }
+
+        private fun compareReversed(str: String) = Comparator<SearchItemWithSelectedResult> { o1, o2 ->
+            o2.getTextComparisonScore(str) - o1.getTextComparisonScore(str)
+        }
+
+        override fun getFilter(): Filter {
+            return  object : Filter() {
+
+                override fun performFiltering(constraint: CharSequence): FilterResults {
+                    val charSearch = constraint.toString()
+                    val results = FilterResults()
+                    results.values = getFilteredArray(charSearch)
+                    return results
+                }
+
+                @Suppress("UNCHECKED_CAST")
+                override fun publishResults(constraint: CharSequence, results: FilterResults) {
+                    val newData = results.values as Array<SearchItemWithSelectedResult>
+                    updateDataset(newData)
+                }
+            }
         }
 
         //just in case I will do some other viewHolders
-        private abstract inner class BaseViewHolder(binding: ViewBinding):
-            RecyclerView.ViewHolder(binding.root)
+        private abstract inner class BaseViewHolder(itemBinding: ViewBinding):
+            RecyclerView.ViewHolder(itemBinding.root)
 
-        private inner class ViewHolder(binding: SearchItemsBinding):
-            BaseViewHolder(binding), View.OnClickListener, View.OnLongClickListener {
+        private inner class ViewHolder(itemBinding: SearchItemsBinding):
+            BaseViewHolder(itemBinding), View.OnClickListener, View.OnLongClickListener {
 
-            val fileNameTV: TextView = binding.nameTextView
-            val similarityTV: TextView = binding.similarityTextView
-            val videoView: VideoView = binding.videoView
-            val thumbnailImageView: ImageView = binding.thumbnailImageView
-            val videoContainer = binding.videoContainer
-            val buttonsContainer = binding.buttonsContainer
-            val textContainer = binding.textContainer
-            val toggleBookmarks = binding.toggleBookmarks
-            val root = binding.root
+            val fileNameTV: TextView = itemBinding.nameTextView
+            val similarityTV: TextView = itemBinding.similarityTextView
+            val videoView: VideoView = itemBinding.videoView
+            val thumbnailImageView: ImageView = itemBinding.thumbnailImageView
+            val videoContainer = itemBinding.videoContainer
+            val buttonsContainer = itemBinding.buttonsContainer
+            val textContainer = itemBinding.textContainer
+            val toggleBookmarks = itemBinding.toggleBookmarks
+            val malButton = itemBinding.MALImageButton
+            val root = itemBinding.root
 
             init {
                 textContainer.layout = R.layout.default_text_layout
@@ -474,7 +539,7 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
             }
 
             private fun loadVideo(item: SearchItem) {
-                val videoURI = item.videoURI?.let { viewModel.getFullVideoURI(it, requireContext()) }
+                val videoURI = item.videoFileName?.let { viewModel.getFullVideoURI(it) }
 
                 if (videoURI == null) {
                     veilVideo()
@@ -520,24 +585,29 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
 
             }
 
-            private fun isSelected(): Boolean {
-                val item = items[bindingAdapterPosition]
-                return item.searchItem.id == viewModel.selectedItem?.searchItem?.id
+            private fun selectUnselectItem() {
+                val item = filteredItems[bindingAdapterPosition]
+                val lastSelected = selectedItem
+                selectedItem = if (lastSelected?.searchItem?.id != item.searchItem.id) {
+                    unselectAll()
+                    item
+                } else {
+                    null
+                }
+                changeStrokeColor()
+
+                showContextualActionBar(selectedItem != null)
+
             }
 
-            private fun selectUnselectItem() {
-                val item = items[bindingAdapterPosition]
-                val lastSelected = viewModel.selectedItem
-                if (lastSelected?.searchItem?.id != item.searchItem.id) {
-                    unselectAll()
-                    viewModel.selectedItem = item
-                } else { viewModel.selectedItem = null }
-
-                changeStrokeColor()
-                showContextualActionBar(viewModel.selectedItem != null)
+            private fun isSelected(): Boolean {
+                val item = filteredItems[bindingAdapterPosition]
+                return item.searchItem.id == selectedItem?.searchItem?.id
             }
 
             private fun changeStrokeColor() {
+                Log.i("TAG", "changeStrokeColor: ${selectedItem?.searchItem?.id}")
+                Log.i("TAG", "changeStrokeColor: ${isSelected()}")
                 root.isSelected = isSelected()
             }
 
@@ -546,17 +616,16 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
 
                 val itemData = item.searchResult
                 if (!item.searchItem.isFinished) {
-                    viewModel.repeatAnimeSearchRequest(item, requireContext())
+                    viewModel.repeatAnimeSearchRequest(item)
                 }
 
-                fileNameTV.text = ((itemData?.english ?: itemData?.romaji) ?:
-                    (itemData?.nativeTitle ?: itemData?.fileName)) ?: ""
+                fileNameTV.text = item.getName()
                 similarityTV.text = itemData?.similarity
                 toggleBookmarks.isChecked = item.searchItem.isBookmarked
                 toggleBookmarks.setOnCheckedChangeListener { _, isChecked ->
                     viewModel.setIsBookmarked(isChecked, item)
                 }
-
+                malButton.setOnClickListener(this@ViewHolder)
                 if (fileNameTV.text.isNotBlank()) { textContainer.unVeil(); textContainer.visibility = View.GONE }
                 else { textContainer.veil(); textContainer.visibility = View.VISIBLE  }
 
@@ -566,13 +635,14 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
             }
 
             override fun onClick(v: View?) {
-                val item = items[bindingAdapterPosition]
+                if (bindingAdapterPosition<0) return
+                val item = filteredItems[bindingAdapterPosition]
                 when(v) {
                     itemView -> selectUnselectItem()
                     thumbnailImageView -> {
                         Log.i("TAG", "bind: loading video ")
                         item.searchItem.let {
-                            val fullURI = item.searchItem.videoURI?.let { viewModel.getFullVideoURI(it, requireContext()) }
+                            val fullURI = item.searchItem.videoFileName?.let { viewModel.getFullVideoURI(it) }
                             fullURI?.let {
                                 videoView.setVideoURI(Uri.fromFile(File(it)))
                             }
@@ -581,6 +651,11 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
                     videoView -> {
                         if (videoView.isPlaying) { videoView.pause() }
                         else { videoView.start() }
+                    }
+                    malButton -> {
+                        item.searchResult?.idMal?.let { idMal ->
+                            openMal(idMal)
+                        }
                     }
                     else -> {}
                 }
@@ -605,10 +680,8 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
                 }
             }
         }
+
     }
-
-
-
 
     private class SearchItemDiffCallback(
         var oldImages: Array<SearchItemWithSelectedResult>,
@@ -629,5 +702,11 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
         override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
             return oldImages[oldItemPosition] == newImages[newItemPosition]
         }
+    }
+
+    interface OnSearchFragmentListener {
+        fun hideFab()
+        fun showFab()
+        fun setSearchFragmentFun()
     }
 }

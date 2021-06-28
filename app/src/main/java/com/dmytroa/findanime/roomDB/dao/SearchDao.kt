@@ -2,7 +2,6 @@ package com.dmytroa.findanime.roomDB.dao
 
 import androidx.room.*
 import com.dmytroa.findanime.dataClasses.roomDBEntity.SearchItem
-import com.dmytroa.findanime.dataClasses.roomDBEntity.SearchItemWithAllResults
 import com.dmytroa.findanime.dataClasses.roomDBEntity.SearchItemWithSelectedResult
 import com.dmytroa.findanime.dataClasses.roomDBEntity.SearchResult
 import kotlinx.coroutines.CoroutineScope
@@ -48,13 +47,11 @@ interface SearchDao {
     @Query("SELECT * FROM searchItem ORDER BY id DESC")
     fun getAllItemsWithSelectedResult(): Flow<Array<SearchItemWithSelectedResult>>
 
-    @Transaction
-    @Query("SELECT * FROM searchItem WHERE id=:id")
-    suspend fun getAllItemsWithAllResults(id: Long): SearchItemWithAllResults
+    @Query("SELECT * FROM searchResult WHERE parentId=:id")
+    suspend fun getAllResultsByItemId(id: Long): Array<SearchResult>
 
     @Query("UPDATE searchItem SET isBookmarked=:b WHERE id=:id")
     suspend fun setIsBookmarked(id: Long, b: Boolean)
-
 
     @Query("UPDATE searchItem SET selectedResultId=:selectedResultId WHERE id=:itemId")
     suspend fun setNewSelectedId(itemId: Long, selectedResultId: Long)

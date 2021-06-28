@@ -60,6 +60,6 @@
         android:paddingBottom="@dimen/list_item_spacing_half"
         android:layout_weight="1"
         android:background="@color/drawer_background"
-        tools:context=".fragments.ImageDrawerListDialogFragment"
+        tools:context=".fragments.imageDrawer.ImageDrawerListDialogFragment"
         tools:listitem="@layout/fragment_image_drawer_list_dialog_item" />
 </LinearLayout>

@@ -1,8 +1,8 @@
-package com.dmytroa.findanime.fragments
+package com.dmytroa.findanime.fragments.imageDrawer
 
 import androidx.lifecycle.*
 import com.dmytroa.findanime.dataClasses.Album
-import com.dmytroa.findanime.fragments.ImageDrawerListDialogFragment.Companion.GALLERY_TYPE
+import com.dmytroa.findanime.fragments.imageDrawer.ImageDrawerListDialogFragment.Companion.GALLERY_TYPE
 
 class ImageDrawerViewModel(private val albums: ArrayList<Album>,
                            allImagesStringLocalized: String) : ViewModel() {

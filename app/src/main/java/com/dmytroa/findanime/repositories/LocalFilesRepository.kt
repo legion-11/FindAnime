@@ -30,10 +30,9 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
 
     fun delete(searchItem: SearchItem, context: Context) {
         CoroutineScope(Dispatchers.IO).launch{
-            searchItem.imageURI?.let { deleteImage(it, context) }
+            searchItem.imageFileName?.let { deleteImage(it, context) }
             searchDao.delete(searchItem)
-            // todo do something with video
-//            deleteVideo(searchItem.video)
+            searchItem.videoFileName?.let { deleteVideo(it, context) }
         }
     }
 
@@ -50,6 +49,10 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
         Log.i(TAG, "getAll: ")
         return searchDao.getAllItemsWithSelectedResult()
     }
+
+    suspend fun getAllResultsByItemId(id: Long): Array<SearchResult> =
+        searchDao.getAllResultsByItemId(id)
+
 
     companion object {
         private const val TAG = "LocalFilesRepository"
@@ -115,10 +118,10 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
         /**
          * copy image to internal storage and send fileName
          **/
-        fun copyImageToInternalStorage(imageUri: Uri, context: Context?): String? {
+        fun copyImageToInternalStorage(imageUri: Uri, context: Context): String? {
             val dstName: Long = System.currentTimeMillis()
-            val dstPath: String = context?.filesDir.toString() + File.separatorChar + dstName
-            val ins = context?.contentResolver?.openInputStream(imageUri)
+            val dstPath: String = context.filesDir.toString() + File.separatorChar + dstName
+            val ins = context.contentResolver?.openInputStream(imageUri)
             val outs = BufferedOutputStream(FileOutputStream(dstPath, false))
 
             try {
@@ -143,9 +146,9 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
             return null
         }
 
-        fun saveVideo(body: ResponseBody, context: Context?): String? {
+        fun saveVideo(body: ResponseBody, context: Context): String? {
             val dstName = "${System.currentTimeMillis()}.mp4"
-            val dstPath: String = context?.getExternalFilesDir(Environment.DIRECTORY_MOVIES)
+            val dstPath: String = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES)
                 .toString() + File.separatorChar + dstName
 
             val ins = body.byteStream()
@@ -175,9 +178,9 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
             return null
         }
 
-        private fun insertInGallery(context: Context?, videoFileName: String) {
+        private fun insertInGallery(context: Context, videoFileName: String) {
             val valuesvideos = ContentValues()
-            val directory = context?.getExternalFilesDir(Environment.DIRECTORY_MOVIES).toString()
+            val directory = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES).toString()
 
             val fullPath = directory + File.separatorChar + videoFileName
 
@@ -188,11 +191,11 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
             val uriSavedVideo = if (Build.VERSION.SDK_INT >= 29) {
                 valuesvideos.put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/" + "Folder")
                 val collection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-                context?.contentResolver?.insert(collection, valuesvideos)
+                context.contentResolver?.insert(collection, valuesvideos)
             } else {
                 val createdvideo = File(directory, videoFileName)
                 valuesvideos.put(MediaStore.Video.Media.DATA, createdvideo.absolutePath)
-                context?.contentResolver?.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, valuesvideos)
+                context.contentResolver?.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, valuesvideos)
             }
 
             if (Build.VERSION.SDK_INT >= 29) {
@@ -201,7 +204,7 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
             }
             try {
                 uriSavedVideo?.let {
-                    context?.contentResolver?.openFileDescriptor(it, "w")?.let { pfd ->
+                    context.contentResolver?.openFileDescriptor(it, "w")?.let { pfd ->
                         val out = FileOutputStream(pfd.fileDescriptor)
                         val storageDir = File(directory)
 
@@ -222,7 +225,7 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
                     if (Build.VERSION.SDK_INT >= 29) {
                         valuesvideos.clear();
                         valuesvideos.put(MediaStore.Video.Media.IS_PENDING, 0);
-                        context?.contentResolver?.update(uriSavedVideo, valuesvideos, null, null);
+                        context.contentResolver?.update(uriSavedVideo, valuesvideos, null, null);
 
                     }
                 }
@@ -232,14 +235,13 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
         }
     }
 
-    private fun deleteVideo(videoName: String, context: Context) {
+    fun deleteVideo(videoName: String, context: Context) {
         val videoURI = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES)
             .toString() + File.separatorChar + videoName
 
         val myFile = File(videoURI)
         Log.i(TAG, "deleteVideo: file existence = ${myFile.exists()}")
         if (myFile.exists()) myFile.delete()
-        //todo maybe move it to cache dir
     }
 
     fun deleteImage(imageName: String?, context: Context) {

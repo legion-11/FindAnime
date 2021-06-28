@@ -24,10 +24,18 @@ data class SearchResult(
     var episode: String?,
     var from: Double,
     var similarity: String,
-    var video: String,
+    var videoURL: String,
+    var imageURL: String,
 ){
     override fun toString(): String {
         return "SearchResult(id=$id, parentId=$parentId, fileName=$fileName, english=$english, native=$nativeTitle, romaji=$romaji, idMal=$idMal, isAdult=$isAdult, episode=$episode, from=$from, similarity=$similarity)"
+    }
+
+    fun getName(): String {
+        return english
+            ?: romaji
+            ?: nativeTitle
+            ?: fileName
     }
 
     override fun equals(other: Any?): Boolean {
@@ -47,7 +55,7 @@ data class SearchResult(
         if (episode != other.episode) return false
         if (from != other.from) return false
         if (similarity != other.similarity) return false
-        if (video != other.video) return false
+        if (videoURL != other.videoURL) return false
 
         return true
     }
@@ -64,7 +72,7 @@ data class SearchResult(
         result = 31 * result + (episode?.hashCode() ?: 0)
         result = 31 * result + from.hashCode()
         result = 31 * result + similarity.hashCode()
-        result = 31 * result + video.hashCode()
+        result = 31 * result + videoURL.hashCode()
         return result
     }
 }

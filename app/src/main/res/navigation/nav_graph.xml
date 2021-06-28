@@ -3,29 +3,29 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/nav_graph"
-    app:startDestination="@id/FirstFragment">
+    app:startDestination="@id/SearchFragment">
 
     <fragment
-        android:id="@+id/FirstFragment"
-        android:name="com.dmytroa.findanime.fragments.SearchFragment"
+        android:id="@+id/SearchFragment"
+        android:name="com.dmytroa.findanime.fragments.search.SearchFragment"
         android:label="@string/first_fragment_label"
         tools:layout="@layout/fragment_search">
 
         <action
-            android:id="@+id/action_FirstFragment_to_SecondFragment"
-            app:destination="@id/SecondFragment"
+            android:id="@+id/action_SearchFragment_to_SeeOtherOptionsFragment"
+            app:destination="@id/SeeOtherOptionsFragment"
             app:popUpToInclusive="false" />
     </fragment>
     <fragment
-        android:id="@+id/SecondFragment"
-        android:name="com.dmytroa.findanime.fragments.SecondFragment"
+        android:id="@+id/SeeOtherOptionsFragment"
+        android:name="com.dmytroa.findanime.fragments.seeOtherOptions.SeeOtherOptionsFragment"
         android:label="@string/second_fragment_label"
-        tools:layout="@layout/fragment_second">
+        tools:layout="@layout/fragment_see_other_options">
 
         <action
-            android:id="@+id/action_SecondFragment_to_FirstFragment"
-            app:destination="@id/FirstFragment"
-            app:popUpTo="@id/FirstFragment"
+            android:id="@+id/action_SeeOtherOptionsFragment_to_SearchFragment"
+            app:destination="@id/SearchFragment"
+            app:popUpTo="@id/SearchFragment"
             app:popUpToInclusive="true" />
     </fragment>
 </navigation>

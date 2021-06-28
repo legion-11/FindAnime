@@ -20,4 +20,5 @@
     <string name="filter_by_bookmark">Filter by bookmark</string>
     <string name="share">Share</string>
     <string name="send_to">Send to</string>
+    <string name="image_from_search_result">image from search result</string>
 </resources>
