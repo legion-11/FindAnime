@@ -31,9 +31,6 @@ interface SearchDao {
         return idOfFirstInsert
     }
 
-    @Query("DELETE FROM searchItem WHERE id=:id")
-    suspend fun delete(id: Long)
-
     @Delete
     suspend fun delete(i: SearchItem)
 
@@ -41,7 +38,10 @@ interface SearchDao {
     suspend fun update(i: SearchItem)
 
     @Query("SELECT * FROM searchItem WHERE id=:id")
-    suspend fun get(id: Long): SearchItemWithSelectedResult
+    suspend fun getSearchItemWithSelectedResult(id: Long): SearchItemWithSelectedResult?
+
+    @Query("SELECT * FROM searchItem WHERE id=:id")
+    suspend fun getSearchItemById(id: Long): SearchItem
 
     @Transaction
     @Query("SELECT * FROM searchItem ORDER BY id DESC")

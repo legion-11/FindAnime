@@ -13,11 +13,10 @@ interface SearchService {
 
     @Multipart
     @POST("/search?anilistInfo")
-    fun searchByImage(
-        @Part image: MultipartBody.Part) : Call<SearchByImageRequestResult>
+    fun searchByImage(@Part image: MultipartBody.Part) : Call<SearchByImageRequestResult>
 
     @GET("/me")
-    suspend fun getQuota() : Response<Quota>
+    fun getQuota() : Call<Quota>
 
     @GET
     @Streaming

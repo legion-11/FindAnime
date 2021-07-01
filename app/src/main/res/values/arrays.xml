@@ -1,0 +1,13 @@
+<resources>
+    <string-array name="video_length_entries">
+        <item>Large</item>
+        <item>Medium</item>
+        <item>Small</item>
+    </string-array>
+
+    <string-array name="video_length_values">
+        <item>l</item>
+        <item>m</item>
+        <item>s</item>
+    </string-array>
+</resources>

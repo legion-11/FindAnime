@@ -1,9 +1,7 @@
 package com.dmytroa.findanime.fragments.search
 
 import android.app.Application
-import android.content.Context
 import android.net.Uri
-import android.os.Environment
 import android.util.Log
 import androidx.lifecycle.*
 import com.dmytroa.findanime.FindAnimeApplication
@@ -34,10 +32,16 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
     val items: LiveData<Array<SearchItemWithSelectedResult>> = repository.getAll().asLiveData()
 
     //not allowing enqueue more than 1 search call
-    private val semaphore = Semaphore(1,0)
+    private val semaphoreImageDownloadConcurrencyLimit = Semaphore(1,0)
+    private val semaphoreForCheckingImageCalls = Semaphore(1,0)
+    private val semaphoreVideoCall = Semaphore(1,0)
+
     private val calls: MutableList<Pair<Call<*>, Long>> = mutableListOf()
+    private val finishedImagesCalls = mutableListOf<Long>()
 
     suspend fun insert(searchItem: SearchItem): Long = repository.insert(searchItem)
+
+    suspend fun getSearchItemById(id: Long) = repository.getSearchItemById(id)
 
     fun delete(searchItem: SearchItem) {
         Log.i(TAG, "delete: $searchItem")
@@ -45,18 +49,20 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
         repository.delete(searchItem, getApplication())
     }
 
-    fun setIsBookmarked(b: Boolean, item: SearchItemWithSelectedResult) {
-        repository.setIsBookmarked(item.searchItem, b)
+    fun setIsBookmarked(b: Boolean, item: SearchItem) {
+        repository.setIsBookmarked(item, b)
     }
+
 
     fun createNewAnimeSearchRequest(imageUri: Uri) {
         viewModelScope.launch {
-            Log.i(TAG, "createNewAnimeSearchRequest: ${calls.size}")
+            Log.i(TAG, "createNewAnimeSearchRequest: calls size = ${calls.size}")
             val imageCopyName = LocalFilesRepository.copyImageToInternalStorage(imageUri, getApplication())
             if (imageCopyName != null) {
                 val newItem = SearchItem(imageCopyName)
                 val newId = insert(newItem)
                 newItem.id = newId
+                //<--- stop 1
                 searchByImage(imageCopyName, newItem)
             } else {
                 //https://stackoverflow.com/questions/53484781/android-mvvm-is-it-possible-to-display-a-message-toast-snackbar-etc-from-the
@@ -65,56 +71,53 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
         }
     }
 
-    fun repeatAnimeSearchRequest(item: SearchItemWithSelectedResult) {
-        viewModelScope.launch {
-            if (calls.map { it.second }.contains(item.searchItem.id)) return@launch
-            item.searchResult?.videoURL?.let {
-                getVideoPreview(it, item.searchItem)
-            } ?: run {
-                item.searchItem.imageFileName?.let {
-                    searchByImage(it, item.searchItem)
-                } ?: run {
-                    delete(item.searchItem)
-                }
-            }
-        }
-    }
-
     private suspend fun searchByImage(copyOfImageUri: String,
                                       searchItemToUpdate: SearchItem) {
-        val fullImageUri = getFullImageURI(copyOfImageUri)
+        semaphoreForCheckingImageCalls.acquire()
+        if (calls.map { it.second }.contains(searchItemToUpdate.id)
+            || finishedImagesCalls.contains(searchItemToUpdate.id)) {
+            semaphoreForCheckingImageCalls.release()
+            return
+        }
+
+        Log.i(TAG, "0 semaphore.acquire()")
+        val fullImageUri = LocalFilesRepository.getFullImageURI(copyOfImageUri, getApplication())
         val body = prepareMultipart(fullImageUri)
         val call = searchService.searchByImage(body)
         calls.add(Pair(call, searchItemToUpdate.id))
 
-        semaphore.acquire()
-
+        semaphoreImageDownloadConcurrencyLimit.acquire()
         call.enqueue(object : Callback<SearchByImageRequestResult> {
             override fun onResponse(
                 call: Call<SearchByImageRequestResult>,
                 response: Response<SearchByImageRequestResult>
             ) {
-                semaphore.release()
-                calls.remove(Pair(call, searchItemToUpdate.id))
                 val responseBody = response.body()
                 if (responseBody != null) {
                     updateSearchItemWithNewData(responseBody, searchItemToUpdate)
+                    Log.i(TAG, "searchByImage.onResponse: response. successful")
                 } else {
                     Log.i(TAG, "searchByImage.onResponse: response.isUnsuccessful")
                 }
+                finishedImagesCalls.add(searchItemToUpdate.id)
+                calls.remove(Pair(call, searchItemToUpdate.id))
+                Log.i(TAG, "1 semaphore.release()")
+                semaphoreImageDownloadConcurrencyLimit.release()
             }
 
             override fun onFailure(call: Call<SearchByImageRequestResult>, t: Throwable) {
-                semaphore.release()
-                calls.remove(Pair(call, searchItemToUpdate.id))
                 Log.i(TAG, "${t.message}")
                 if (call.isCanceled){
                     Log.i(TAG, "searchByImage.onFailure: response.canceled")
                 } else {
                     Log.i(TAG, "searchByImage.onFailure: response.isUnsuccessful")
                 }
+                calls.remove(Pair(call, searchItemToUpdate.id))
+                Log.i(TAG, "2 semaphore.release()")
+                semaphoreImageDownloadConcurrencyLimit.release()
             }
         })
+        semaphoreForCheckingImageCalls.release()
     }
 
     private fun prepareMultipart(uri: String):  MultipartBody.Part {
@@ -147,24 +150,52 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
                 )
             }
 
-
-            searchItemToUpdate.apply {
+            Log.i(TAG, "updateSearchItemWithNewData: deleteImage ${searchItemToUpdate.imageFileName} ")
+            LocalFilesRepository.deleteImage(searchItemToUpdate.imageFileName, getApplication())
+            semaphoreVideoCall.acquire()
+            val newInstance = searchItemToUpdate.apply {
                 selectedResultId = repository.insertAllAndReturnIdOfFirst(listToInsert)
+                imageFileName = null
             }
-            repository.update(searchItemToUpdate)
 
-            CoroutineScope(Dispatchers.IO).launch {
-                repository.deleteImage(searchItemToUpdate.imageFileName, getApplication())
-            }
-            getVideoPreview(listToInsert[0].videoURL, searchItemToUpdate)
+            repository.update(newInstance)
+            getVideoPreview(listToInsert[0].videoURL, newInstance)
         }
     }
 
-    fun replaceWithNewVideo(searchItemToUpdate: SearchItem, newSearchResult: SearchResult){
+    fun repeatAnimeSearchRequest(item: SearchItemWithSelectedResult) {
         viewModelScope.launch {
-            searchItemToUpdate.videoFileName?.let {
-                repository.deleteVideo(it, getApplication())
+            item.searchResult?.videoURL?.let {
+                semaphoreVideoCall.acquire()
+                if (calls.map {p-> p.second }.contains(item.searchItem.id)) {
+                    semaphoreVideoCall.release()
+                    return@launch
+                }
+                val searchItemToUpdate = repository.getSearchItemById(item.searchItem.id)
+                searchItemToUpdate.videoFileName?.let {
+                    semaphoreVideoCall.release()
+                    return@launch
+                }
+                getVideoPreview(it, item.searchItem.copy())
+            } ?: run {
+                item.searchItem.imageFileName?.let {
+                    searchByImage(it, item.searchItem.copy())
+                } ?: run {
+                    delete(item.searchItem)
+                }
             }
+        }
+    }
+
+    fun replaceWithNewVideo(searchItemId: Long, newSearchResult: SearchResult){
+        viewModelScope.launch {
+            semaphoreVideoCall.acquire()
+            cancelCall(searchItemId)
+            val searchItemToUpdate = repository.getSearchItemById(searchItemId)
+            Log.i(TAG, "replaceWithNewVideo: ${searchItemToUpdate.videoFileName} " +
+                    "${calls.map { it.second }} ${searchItemToUpdate.id}")
+
+            searchItemToUpdate.videoFileName?.let { LocalFilesRepository.deleteVideo(it, getApplication()) }
             searchItemToUpdate.selectedResultId = newSearchResult.id
             searchItemToUpdate.videoFileName = null
             repository.update(searchItemToUpdate)
@@ -172,7 +203,10 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
         }
     }
 
-    private fun getVideoPreview(url: String, searchItemToUpdate: SearchItem){
+    private suspend fun getVideoPreview(url: String, searchItemToUpdate: SearchItem){
+
+        val fileName = "${System.currentTimeMillis()}.mp4"
+        Log.i(TAG, "getVideoPreview: $fileName, ${calls.map { it.second }}")
 
         val call = searchService.getVideoPreview(url)
         val callWithId = Pair(call, searchItemToUpdate.id)
@@ -183,60 +217,57 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
                 call: Call<ResponseBody>,
                 response: Response<ResponseBody>
             ) {
-                calls.remove(callWithId)
-                val responseBody = response.body()
-                if (responseBody != null) {
-                    val fileUri = LocalFilesRepository.saveVideo(responseBody, getApplication())
-                    if (fileUri != null) {
-
-                        updateSearchItemWithVideo(searchItemToUpdate, fileUri)
+                CoroutineScope(Dispatchers.IO).launch {
+                    Log.i(TAG, "getVideoPreview: onResponse $fileName")
+                    val responseBody = response.body()
+                    if (responseBody != null) {
+                        val fileUri = LocalFilesRepository.saveVideo(responseBody, fileName, getApplication())
+                        if (fileUri != null) {
+                            updateSearchItemWithVideo(searchItemToUpdate, fileUri)
+                        } else {
+                            Log.i(TAG, "getVideoPreview: canceled during saving video $fileName")
+                            LocalFilesRepository.deleteVideo(fileName, getApplication())
+                        }
                     } else {
-                        Log.i(TAG, "getVideoPreview: cannot save video")
+                        Log.i(TAG, "getVideoPreview: response.isUnsuccessful $fileName")
                     }
-                } else {
-                    Log.i(TAG, "getVideoPreview: response.isUnsuccessful")
+                    calls.remove(callWithId)
                 }
             }
 
             override fun onFailure(call: Call<ResponseBody>, t: Throwable) {
-                calls.remove(callWithId)
+                LocalFilesRepository.deleteVideo(fileName, getApplication())
                 if (call.isCanceled){
-                    Log.i(TAG, "getVideoPreview: response.canceled")
+                    Log.i(TAG, "getVideoPreview: response.canceled $fileName")
                 } else {
-                    Log.i(TAG, "getVideoPreview: response.isUnsuccessful")
+                    Log.i(TAG, "getVideoPreview: response.isUnsuccessful $fileName")
                 }
+                calls.remove(callWithId)
             }
         })
+        semaphoreVideoCall.release()
     }
 
-    private fun updateSearchItemWithVideo(searchItemToUpdate: SearchItem, fileUri: String) {
-        viewModelScope.launch {
-            searchItemToUpdate.apply {
-                videoFileName = fileUri
-            }
-            repository.update(searchItemToUpdate)
+    private suspend fun updateSearchItemWithVideo(searchItemToUpdate: SearchItem, fileUri: String) {
+        searchItemToUpdate.apply {
+            videoFileName = fileUri
         }
+        repository.update(searchItemToUpdate)
+        Log.i(TAG, "updateSearchItemWithVideo: $fileUri")
+
     }
 
-    private fun cancelCall(id: Long) {
+    private fun cancelCall(id: Long): Boolean {
         for (pair in calls){
             if (pair.second == id) {
                 pair.first.cancel()
-                Log.i(TAG, "cancelCall: call ${pair.second} canceled")
                 calls.remove(pair)
-                break
+                Log.i(TAG, "cancelCall: call ${pair.second} canceled ${calls.map {it.second}}")
+                return true
             }
         }
+        return false
     }
-
-    fun getFullVideoURI(fileName: String) =
-        getApplication<FindAnimeApplication>().applicationContext
-            .getExternalFilesDir(Environment.DIRECTORY_MOVIES)
-            .toString() + File.separatorChar + fileName
-
-    private fun getFullImageURI(fileName: String) =
-        getApplication<FindAnimeApplication>().applicationContext
-            .filesDir.toString() + File.separatorChar + fileName
 
     class SearchFragmentViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {

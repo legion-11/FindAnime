@@ -36,10 +36,11 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
         }
     }
 
-    fun update(searchItem: SearchItem) =
-        CoroutineScope(Dispatchers.IO).launch{ searchDao.update(searchItem) }
+    suspend fun getSearchItemById(id: Long) = searchDao.getSearchItemById(id)
 
-    suspend fun get(id: Long): SearchItemWithSelectedResult = searchDao.get(id)
+    suspend fun update(searchItem: SearchItem) = searchDao.update(searchItem)
+
+    suspend fun getSearchItemWithSelectedResult(id: Long): SearchItemWithSelectedResult? = searchDao.getSearchItemWithSelectedResult(id)
 
     fun setIsBookmarked(searchItem: SearchItem, b: Boolean) {
         CoroutineScope(Dispatchers.IO).launch{ searchDao.setIsBookmarked(searchItem.id, b) }
@@ -146,10 +147,8 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
             return null
         }
 
-        fun saveVideo(body: ResponseBody, context: Context): String? {
-            val dstName = "${System.currentTimeMillis()}.mp4"
-            val dstPath: String = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES)
-                .toString() + File.separatorChar + dstName
+        fun saveVideo(body: ResponseBody, fileName: String, context: Context): String? {
+            val dstPath = getFullVideoURI(fileName, context)
 
             val ins = body.byteStream()
             val outs = FileOutputStream(dstPath)
@@ -161,8 +160,9 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
                         output.write(buf, 0, read)
                     }
                     output.flush()
-                    return dstName
                 }
+                Log.i(TAG, "saveVideo: $fileName success")
+                return fileName
             } catch (e: IOException) {
                 e.printStackTrace()
             } finally {
@@ -170,13 +170,20 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
                     ins.close()
                     outs.close()
 //                    insertInGallery(context, dstName)
-                    Log.i(TAG, "saveVideo: success")
                 } catch (e: IOException) {
                     e.printStackTrace()
                 }
             }
             return null
         }
+
+
+        fun getFullVideoURI(fileName: String, context: Context) =
+            context.getExternalFilesDir(Environment.DIRECTORY_MOVIES)
+                .toString() + File.separatorChar + fileName
+
+        fun getFullImageURI(fileName: String, context: Context) =
+            context.filesDir.toString() + File.separatorChar + fileName
 
         private fun insertInGallery(context: Context, videoFileName: String) {
             val valuesvideos = ContentValues()
@@ -233,22 +240,24 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
                 e.printStackTrace()
             }
         }
+
+        fun deleteVideo(videoName: String, context: Context) {
+            val videoURI = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES)
+                .toString() + File.separatorChar + videoName
+
+            val myFile = File(videoURI)
+            Log.i(TAG, "deleteVideo: file $videoName existence = ${myFile.exists()}")
+            if (myFile.exists()) myFile.delete()
+        }
+
+        fun deleteImage(imageName: String?, context: Context) {
+            Log.i(TAG, "deleteImage: file $imageName")
+            imageName?.let {
+                val imageURI =  getFullImageURI(it, context)
+                val myFile = File(imageURI)
+                Log.i(TAG, "deleteImage: file existence = ${myFile.exists()}")
+                if (myFile.exists()) myFile.delete()
+            }
+        }
     }
-
-    fun deleteVideo(videoName: String, context: Context) {
-        val videoURI = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES)
-            .toString() + File.separatorChar + videoName
-
-        val myFile = File(videoURI)
-        Log.i(TAG, "deleteVideo: file existence = ${myFile.exists()}")
-        if (myFile.exists()) myFile.delete()
-    }
-
-    fun deleteImage(imageName: String?, context: Context) {
-        val imageURI = context.filesDir.toString() + File.separatorChar + imageName
-        val myFile = File(imageURI)
-        Log.i(TAG, "deleteImage: file existence = ${myFile.exists()}")
-        if (myFile.exists()) myFile.delete()
-    }
-
 }

@@ -14,6 +14,8 @@
         <action
             android:id="@+id/action_SearchFragment_to_SeeOtherOptionsFragment"
             app:destination="@id/SeeOtherOptionsFragment"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@android:anim/slide_out_right"
             app:popUpToInclusive="false" />
     </fragment>
     <fragment
@@ -28,4 +30,8 @@
             app:popUpTo="@id/SearchFragment"
             app:popUpToInclusive="true" />
     </fragment>
+    <fragment
+        android:id="@+id/SettingsFragment"
+        android:name="com.dmytroa.findanime.fragments.SettingsFragment"
+        android:label="SettingsFragment" />
 </navigation>
