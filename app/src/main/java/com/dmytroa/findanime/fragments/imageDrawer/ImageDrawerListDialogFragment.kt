@@ -284,7 +284,7 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
         init { itemView.setOnClickListener(this) }
 
         override fun onClick(v: View?) {
-            val imageUri = Uri.withAppendedPath(uriExternal, imagesIds[adapterPosition].toString())
+            val imageUri = Uri.withAppendedPath(uriExternal, imagesIds[bindingAdapterPosition].toString())
             listener.onImageClick(imageUri)
             dismiss()
         }

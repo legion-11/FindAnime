@@ -91,11 +91,9 @@ class SearchItemAdapter(
 
     private var needScroll = false
     fun setFullDataset(newDataset : Array<SearchItemWithSelectedResult>) {
-        Log.i("SearchItemAdapter", "setFullDataset: old ${allItems.toList()} ")
         val oldItems = allItems
         needScroll = allItems.size == filteredItems.size && oldItems.size < newDataset.size
         allItems = newDataset
-        Log.i("SearchItemAdapter", "setFullDataset: new ${newDataset.toList()} ")
         filter.filter(textFilter)
     }
 

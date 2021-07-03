@@ -57,7 +57,7 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
     fun createNewAnimeSearchRequest(imageUri: Uri) {
         viewModelScope.launch {
             Log.i(TAG, "createNewAnimeSearchRequest: calls size = ${calls.size}")
-            val imageCopyName = LocalFilesRepository.copyImageToInternalStorage(imageUri, getApplication())
+            val imageCopyName = LocalFilesRepository.copyImageToCacheDir(imageUri, getApplication())
             if (imageCopyName != null) {
                 val newItem = SearchItem(imageCopyName)
                 val newId = insert(newItem)
@@ -80,8 +80,14 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
             return
         }
 
-        Log.i(TAG, "0 semaphore.acquire()")
-        val fullImageUri = LocalFilesRepository.getFullImageURI(copyOfImageUri, getApplication())
+        val fullImageUri = LocalFilesRepository.getFullImagePath(copyOfImageUri, getApplication())
+
+        if (!File(fullImageUri).exists()) {
+            delete(searchItemToUpdate)
+            semaphoreForCheckingImageCalls.release()
+            return
+        }
+
         val body = prepareMultipart(fullImageUri)
         val call = searchService.searchByImage(body)
         calls.add(Pair(call, searchItemToUpdate.id))
@@ -101,7 +107,6 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
                 }
                 finishedImagesCalls.add(searchItemToUpdate.id)
                 calls.remove(Pair(call, searchItemToUpdate.id))
-                Log.i(TAG, "1 semaphore.release()")
                 semaphoreImageDownloadConcurrencyLimit.release()
             }
 
@@ -113,7 +118,6 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
                     Log.i(TAG, "searchByImage.onFailure: response.isUnsuccessful")
                 }
                 calls.remove(Pair(call, searchItemToUpdate.id))
-                Log.i(TAG, "2 semaphore.release()")
                 semaphoreImageDownloadConcurrencyLimit.release()
             }
         })
@@ -204,7 +208,6 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
     }
 
     private suspend fun getVideoPreview(url: String, searchItemToUpdate: SearchItem){
-
         val fileName = "${System.currentTimeMillis()}.mp4"
         Log.i(TAG, "getVideoPreview: $fileName, ${calls.map { it.second }}")
 
@@ -221,16 +224,20 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
                     Log.i(TAG, "getVideoPreview: onResponse $fileName")
                     val responseBody = response.body()
                     if (responseBody != null) {
-                        val fileUri = LocalFilesRepository.saveVideo(responseBody, fileName, getApplication())
-                        if (fileUri != null) {
-                            updateSearchItemWithVideo(searchItemToUpdate, fileUri)
+                        val savedfileName = LocalFilesRepository
+                            .saveVideoToExternalStorage(responseBody, fileName, getApplication())
+
+                        if (savedfileName != null) {
+                            updateSearchItemWithVideo(searchItemToUpdate, savedfileName)
                         } else {
                             Log.i(TAG, "getVideoPreview: canceled during saving video $fileName")
                             LocalFilesRepository.deleteVideo(fileName, getApplication())
                         }
+
                     } else {
                         Log.i(TAG, "getVideoPreview: response.isUnsuccessful $fileName")
                     }
+
                     calls.remove(callWithId)
                 }
             }

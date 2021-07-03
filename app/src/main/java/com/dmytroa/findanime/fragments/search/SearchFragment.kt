@@ -12,6 +12,7 @@ import android.view.*
 import android.widget.*
 import androidx.appcompat.view.ActionMode
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.ViewModelProvider
@@ -95,11 +96,11 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
                 R.id.action_see -> {
                     mode?.finish()
                     try {
-                        Log.i("SearchFragment", "onActionItemClicked: ${sharedViewModel.selectedItemId.value}")
+                        Log.i(TAG, "onActionItemClicked: ${sharedViewModel.selectedItemId.value}")
                         findNavController()
                             .navigate(R.id.action_SearchFragment_to_SeeOtherOptionsFragment)
                     } catch (e: IllegalArgumentException) {
-                        Log.i("SearchFragment", "onActionItemClicked: double click")
+                        Log.i(TAG, "onActionItemClicked: double click")
                     }
                     true
                 }
@@ -176,7 +177,7 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?,
                               savedInstanceState: Bundle?): View {
-        Log.i("SearchFragment", "onCreateView: ")
+        Log.i(TAG, "onCreateView: ")
         setHasOptionsMenu(true)
         val application = requireActivity().application as FindAnimeApplication
         viewModel = ViewModelProvider(
@@ -190,7 +191,7 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        Log.i("SearchFragment", "onViewCreated: ")
+        Log.i(TAG, "onViewCreated: ")
 
         if (sharedViewModel.makeReplacement) {
             sharedViewModel.makeReplacement = false
@@ -212,10 +213,10 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
                 binding.searchResultRecyclerView.adapter = searchAdapter
                 val itemTouchHelper = ItemTouchHelper(simpleCallback)
                 itemTouchHelper.attachToRecyclerView(binding.searchResultRecyclerView)
-                Log.i("SearchFragment", "onViewCreated: set dataset ${it.toList()}")
+                Log.i(TAG, "onViewCreated: set dataset ${it.toList()}")
                 return@observe
             }
-            Log.i("SearchFragment", "onViewCreated: update dataset ${it.toList()}")
+            Log.i(TAG, "onViewCreated: update dataset ${it.toList()}")
 
             searchAdapter?.setFullDataset(it)
         })
@@ -254,31 +255,6 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
         viewModel.createNewAnimeSearchRequest(imageUri)
     }
 
-    // FileProvider's uri sends video as a file to telegram
-    // https://stackoverflow.com/a/63600425/15225582
-    private fun getVideoContentUri(videoFile: File): Uri? {
-        var uri: Uri? = null
-        val cursor = context?.contentResolver?.query(
-            MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
-            arrayOf(MediaStore.Video.Media._ID),
-            MediaStore.Video.Media.DISPLAY_NAME + "=? ",
-            arrayOf(videoFile.name), null)
-
-        if (cursor != null && cursor.moveToFirst()) {
-            val id = cursor.getInt(cursor.getColumnIndex(MediaStore.MediaColumns._ID))
-            val baseUri = Uri.parse("content://media/external/video/media")
-            uri = Uri.withAppendedPath(baseUri, "" + id)
-        } else if (videoFile.exists()) {
-            val values = ContentValues()
-            values.put(MediaStore.Video.Media.DISPLAY_NAME, videoFile.name)
-            uri = context?.contentResolver?.insert(
-                MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
-        }
-
-        cursor?.close()
-        return uri
-    }
-
     override fun openMal(idMal: Int) {
         val url = "https://myanimelist.net/anime/$idMal"
         val i = Intent(Intent.ACTION_VIEW)
@@ -305,6 +281,33 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
         }
     }
 
+    // FileProvider's uri sends video as a file to telegram
+    // https://stackoverflow.com/a/63600425/15225582
+    private fun getVideoContentUri(videoFile: File): Uri? {
+
+        val cursor = context?.contentResolver?.query(
+            MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+            arrayOf(MediaStore.Video.Media._ID),
+            "${MediaStore.Video.Media.DISPLAY_NAME} = ? AND ${MediaStore.Video.Media.DATA} like ?",
+            arrayOf(videoFile.name, "%/Find Anime/%"),
+            null)
+
+        val uri: Uri? = if (cursor != null && cursor.moveToFirst()) {
+            val id = cursor.getInt(cursor.getColumnIndex(MediaStore.MediaColumns._ID))
+            Uri.withAppendedPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, "$id")
+        } else if (videoFile.exists()) {
+            val values = ContentValues()
+            values.put(MediaStore.Video.Media.DISPLAY_NAME, videoFile.name)
+            context?.contentResolver?.insert(
+                MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
+        } else {
+            null
+        }
+
+        cursor?.close()
+        return uri
+    }
+
     private fun shareItem(id: Long) {
         CoroutineScope(Dispatchers.IO).launch {
             viewModel.getSearchItemById(id).videoFileName?.let { shareItem(it) }
@@ -312,14 +315,31 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
     }
 
     private fun shareItem(fileName: String) {
-        val videoContentUri = getVideoContentUri(File(LocalFilesRepository.getFullVideoURI(fileName, requireContext())))
+        Log.i(TAG, "shareItem: ")
+        val videoContentUri = FileProvider.getUriForFile(requireContext(),
+            "${activity?.applicationContext?.packageName}.provider",
+            File(LocalFilesRepository.getFullVideoURI(fileName, requireContext()))
+        )
+        Log.i("TAG", "shareItem: $videoContentUri")
+
+//        val fileInExternalDir = File(LocalFilesRepository.getVideoDirPath(requireContext()), fileName)
+//        val saveCopy =
+//            LocalFilesRepository.saveVideoToPublicStorage(
+//                fileInExternalDir,
+//                "tmp",
+//                requireContext()
+//            ) ?: return
+//        Log.i(TAG, "shareItem: ${saveCopy.path}")
+        Log.i("TAG", "shareItem: $videoContentUri")
+
         val shareIntent: Intent = Intent().apply {
             action = Intent.ACTION_SEND
+            flags =  Intent.FLAG_GRANT_READ_URI_PERMISSION
             putExtra(
                 Intent.EXTRA_STREAM,
                 videoContentUri
             )
-            type = "video/*"
+            type = "video/mp4"
         }
         startActivity(Intent.createChooser(shareIntent, resources.getText(R.string.send_to)))
     }
@@ -339,6 +359,7 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
 
     companion object {
         const val REQUEST_PERMISSION = 100
+        const val TAG = "SearchFragment"
     }
 
     interface OnCreateToolbar {
@@ -373,4 +394,5 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
             else -> super.onOptionsItemSelected(item)
         }
     }
+
 }
