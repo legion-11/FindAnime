@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
+import android.os.StrictMode
 import android.util.Log
 import android.view.MenuItem
 import android.view.View
@@ -25,6 +26,7 @@ import com.dmytroa.findanime.fragments.imageDrawer.ImageDrawerListDialogFragment
 import com.dmytroa.findanime.fragments.search.SearchFragment
 import com.dmytroa.findanime.fragments.search.SearchFragment.Companion.REQUEST_PERMISSION
 import com.dmytroa.findanime.fragments.seeOtherOptions.SeeOtherOptionsFragment
+import com.dmytroa.findanime.repositories.LocalFilesRepository
 import com.dmytroa.findanime.retrofit.RetrofitInstance
 import com.dmytroa.findanime.retrofit.SearchService
 import com.dmytroa.findanime.shared.OnFragmentListener
@@ -58,6 +60,7 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+
         fab = findViewById(R.id.floatingActionButton)
         fab.setOnSafeClickListener { requestPermission() }
         toolbar = findViewById(R.id.toolbar)
@@ -82,6 +85,8 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
                 return true
             }
         })
+
+        LocalFilesRepository.createNoMediaFile(this)
     }
 
 

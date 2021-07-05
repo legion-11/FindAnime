@@ -57,8 +57,25 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
         searchDao.getAllResultsByItemId(id)
 
 
+
     companion object {
         private const val TAG = "LocalFilesRepository"
+
+        fun createNoMediaFile(context: Context) {
+            val dstDir = File(getVideoDirPath(context))
+            if (!dstDir.exists())
+                dstDir.mkdirs()
+            val fileToCreate = File(dstDir, ".nomedia")
+            if (!fileToCreate.exists())
+                fileToCreate.createNewFile()
+        }
+
+        fun deleteNoMediaFile(context: Context) {
+            val dstDir = File(getVideoDirPath(context))
+            val fileToCreate = File(dstDir, ".nomedia")
+            if (fileToCreate.exists())
+                fileToCreate.delete()
+        }
 
         /**
          * Obtain all albums on device
@@ -147,14 +164,6 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
             return null
         }
 
-        fun saveVideoToPublicStorage(file: File, fileName: String, context: Context): File? {
-            return if(Build.VERSION.SDK_INT >= 29) {
-                copyVideoQAndAbove(file, fileName, context)
-            } else {
-                copyVideoBelowQ(file, fileName, context)
-            }
-        }
-
         fun saveVideoToExternalStorage(body: ResponseBody, fileName: String, context: Context): String? {
             val dstDir = File(getVideoDirPath(context))
             if (!dstDir.exists())
@@ -170,7 +179,6 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
                             Log.i(TAG, "saveVideo: finished ${fileToCreate.path}")
                         }
                     }
-                    insertInGallery(context, fileName)
                     fileName
                 } catch (e: IOException) {
                     e.printStackTrace()
@@ -180,127 +188,87 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
             return null
         }
 
-        private fun insertInGallery(context: Context?, videoFileName: String) {
-            val valuesvideos = ContentValues()
-            val directory = context?.getExternalFilesDir(Environment.DIRECTORY_MOVIES).toString()
-
-            val fullPath = directory + File.separatorChar + videoFileName
-
-            valuesvideos.put(MediaStore.Video.Media.TITLE, videoFileName)
-            valuesvideos.put(MediaStore.Video.Media.DISPLAY_NAME, videoFileName)
-            valuesvideos.put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
-            valuesvideos.put(MediaStore.Video.Media.DATE_ADDED, System.currentTimeMillis() / 1000)
-            val uriSavedVideo = if (Build.VERSION.SDK_INT >= 29) {
-                valuesvideos.put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/" + "Folder")
-                val collection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-                context?.contentResolver?.insert(collection, valuesvideos)
+        fun createTemporaryCopyInPublicStorage(file: File, context: Context): Uri? {
+            val fileName = "tmp"
+            return if(Build.VERSION.SDK_INT >= 29) {
+                val uri = findCreatedTemporaryUri(context, fileName, TEMPORARY_DIR_Q)
+                copyVideoQAndAbove(context, file, uri, fileName, TEMPORARY_DIR_Q)
             } else {
-                val createdvideo = File(directory, videoFileName)
-                valuesvideos.put(MediaStore.Video.Media.DATA, createdvideo.absolutePath)
-                context?.contentResolver?.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, valuesvideos)
-            }
 
-            if (Build.VERSION.SDK_INT >= 29) {
-                valuesvideos.put(MediaStore.Video.Media.DATE_TAKEN, videoFileName);
-                valuesvideos.put(MediaStore.Video.Media.IS_PENDING, 1);
-            }
-            try {
-                uriSavedVideo?.let {
-                    context?.contentResolver?.openFileDescriptor(it, "w")?.let { pfd ->
-                        val out = FileOutputStream(pfd.fileDescriptor)
-                        val storageDir = File(directory)
-
-                        //Directory and the name of your video file to copy
-                        val videoFile = File(fullPath)
-
-                        val ins = FileInputStream(videoFile)
-
-                        val buf = ByteArray(2*1024)
-                        var len: Int
-                        while (ins.read(buf).also { len = it } > 0) {
-                            out.write(buf, 0, len)
-                        }
-                        out.close()
-                        ins.close()
-                        pfd.close()
-                    }
-                    if (Build.VERSION.SDK_INT >= 29) {
-                        valuesvideos.clear();
-                        valuesvideos.put(MediaStore.Video.Media.IS_PENDING, 0);
-                        context?.contentResolver?.update(uriSavedVideo, valuesvideos, null, null);
-
-                    }
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
+                val uri = findCreatedTemporaryUri(context, fileName, TEMPORARY_DIR_BELOWQ)
+                copyVideoBelowQ(context, file, uri, fileName, TEMPORARY_DIR_BELOWQ)
             }
         }
 
-        private fun copyVideoBelowQ(file: File, fileName: String, context: Context): File? {
-            val dstDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES).path, "Find Anime")
-            if (!dstDir.exists())
-                dstDir.mkdirs()
-            Log.i(TAG, "saveVideo: ${dstDir.path}")
-            val fileToCreate = File(dstDir, fileName)
+        private fun findCreatedTemporaryUri(context: Context, fileName: String, path: String): Uri? {
+            val collection = if(Build.VERSION.SDK_INT >= 29) {
+                MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+            } else {
+                MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+            }
 
-            if (fileToCreate.createNewFile()) {
-                Log.i(TAG, "saveVideo: created")
-                try {
-                    file.inputStream().use { input ->
-                        fileToCreate.outputStream().use { output ->
-                            input.copyTo(output, 2 * 1024)
-                            Log.i(TAG, "saveVideo: finished ${fileToCreate.path}")
-                        }
-                    }
-                    val values = ContentValues().apply {
-                        put(MediaStore.Video.Media.DISPLAY_NAME, fileToCreate.name)
-                        put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
-                        put(MediaStore.Video.Media.DATA, fileToCreate.path)
-                    }
-                    context.contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
-                    return fileToCreate
-                } catch (e: IOException) {
-                    e.printStackTrace()
-                    return null
+            val selection = if (Build.VERSION.SDK_INT >= 29) {
+                "${MediaStore.Video.Media.TITLE} = ? AND " +
+                        "${MediaStore.Video.Media.RELATIVE_PATH} = ? "
+            } else {
+                "${MediaStore.Video.Media.TITLE} = ? AND " +
+                        "${MediaStore.Video.Media.DATA} = ? "
+            }
+
+            val args = if (Build.VERSION.SDK_INT >= 29) {
+                arrayOf(fileName, path)
+            } else {
+                arrayOf(fileName, File(path, fileName).absolutePath)
+            }
+
+            context.contentResolver.query(
+                collection,
+                arrayOf(MediaStore.Video.Media._ID),
+                selection,
+                args,
+                null
+            ).use { cursor ->
+                return if (cursor != null && cursor.moveToFirst()) {
+                    val columnIndexID = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
+                    val id = cursor.getLong(columnIndexID)
+                    Log.i(TAG, "saveVideoQAndAbove: contentUri was already added $id $path $fileName")
+                    Uri.withAppendedPath(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, "$id")
+                } else {
+                    null
                 }
             }
-            return null
         }
-
 
         @RequiresApi(Build.VERSION_CODES.Q)
-        private fun copyVideoQAndAbove(file: File, fileName: String, context: Context): File? {
-            val collection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-            val relPath = Environment.DIRECTORY_MOVIES + File.separator + "Find Anime" + File.separator
+        private fun copyVideoQAndAbove(context: Context,
+                                       fileToCopy: File,
+                                       uri: Uri?,
+                                       fileName: String,
+                                       relPath: String): Uri? {
+
             val contentDetails = ContentValues().apply {
-                put(MediaStore.Video.Media.DISPLAY_NAME, fileName)
-                put(MediaStore.Video.Media.RELATIVE_PATH, relPath)
                 put(MediaStore.Video.Media.IS_PENDING, 1)
             }
-            val checkUri = context.contentResolver.query(collection,
-                arrayOf(MediaStore.Images.Media._ID),
-                "${MediaStore.Video.Media.DISPLAY_NAME} = ?" +
-                        " AND ${MediaStore.Video.Media.RELATIVE_PATH} = ?",
-                arrayOf(fileName, relPath),
-                null
-            )
-            val contentUri = if (checkUri != null && checkUri.moveToFirst()) {
-                Log.i(TAG, "saveVideoQAndAbove: contentUri was already added")
-                val columnIndexID = checkUri.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
-                val id = checkUri.getLong(columnIndexID)
-                Uri.withAppendedPath(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, "$id")
+
+            val contentUri = if (uri != null) {
+                context.contentResolver.update(uri, contentDetails, null, null)
+                uri
             } else {
-                Log.i(TAG, "saveVideoQAndAbove: contentUri insert")
+                contentDetails.apply {
+                    Log.i(TAG, "saveVideoQAndAbove: contentUri insert")
+                    put(MediaStore.Video.Media.DISPLAY_NAME, fileName)
+                    put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+                    put(MediaStore.Video.Media.RELATIVE_PATH, relPath)
+                }
+                val collection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
                 context.contentResolver.insert(collection, contentDetails)
             }
-            checkUri?.close()
-            Log.i(TAG, "saveVideoQAndAbove: contentUri = $contentUri")
 
-            contentUri?.let { insertedContentUri ->
-                Log.i(TAG, "saveVideoQAndAbove: $insertedContentUri")
+            Log.i(TAG, "saveVideoQAndAbove: $contentUri")
+            return contentUri?.let { createdUri ->
                 try {
-                    context.contentResolver.openFileDescriptor(insertedContentUri, "w").use { pfd ->
-                        ParcelFileDescriptor.AutoCloseOutputStream(pfd).write(file.readBytes())
+                    context.contentResolver.openFileDescriptor(createdUri, "w").use { pfd ->
+                        ParcelFileDescriptor.AutoCloseOutputStream(pfd).write(fileToCopy.readBytes())
                     }
                 } catch (e: IOException) {
                     e.printStackTrace()
@@ -308,16 +276,60 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
 
                 contentDetails.clear()
                 contentDetails.put(MediaStore.Video.Media.IS_PENDING, 0)
-                context.contentResolver.update(insertedContentUri, contentDetails, null, null)
-                return File(insertedContentUri.path!!)
+                context.contentResolver.update(createdUri, contentDetails, null, null)
+                createdUri
             }
+        }
+
+        private fun copyVideoBelowQ(context: Context,
+                                    fileToCopy: File,
+                                    uri: Uri?,
+                                    fileName: String,
+                                    dstParentPath: String): Uri? {
+            val dstDir = File(dstParentPath)
+            if (!dstDir.exists())
+                dstDir.mkdirs()
+
+            val fileToCreate = File(dstDir, fileName)
+
+            fileToCreate.delete()
+            fileToCreate.createNewFile()
+            Log.i(TAG, "saveVideo: created ${fileToCreate.name}")
+            try {
+                fileToCopy.inputStream().use { input ->
+                    fileToCreate.outputStream().use { output ->
+                        input.copyTo(output, 2 * 1024)
+                        Log.i(TAG, "saveVideo: finished ${fileToCreate.path}")
+                    }
+                }
+                return uri ?: let {
+                    val values = ContentValues().apply {
+                        put(MediaStore.Video.Media.TITLE, fileToCreate.name)
+                        put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+                        put(MediaStore.Video.Media.DATA, fileToCreate.path)
+                    }
+                    context.contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
+                }
+            } catch (e: IOException) {
+                e.printStackTrace()
+            }
+
             return null
         }
+
+        private val TEMPORARY_DIR_Q = Environment.DIRECTORY_MOVIES + File.separator +
+                "Find Anime" + File.separator +
+                "temporary" + File.separator
+
+        private val TEMPORARY_DIR_BELOWQ = Environment.getExternalStoragePublicDirectory(
+            Environment.DIRECTORY_MOVIES).absolutePath + File.separator +
+                "Find Anime" + File.separator +
+                "temporary" + File.separator
 
         fun getVideoDirPath(context: Context) =
             context.getExternalFilesDir(Environment.DIRECTORY_MOVIES).toString()
 
-        fun getFullVideoURI(fileName: String, context: Context) =
+        fun getFullVideoPath(fileName: String, context: Context) =
             getVideoDirPath(context) + File.separatorChar + fileName
 
         fun getImagesDirPath(context: Context) =
@@ -327,7 +339,7 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
             getImagesDirPath(context) + File.separatorChar + fileName
 
         fun deleteVideo(videoName: String, context: Context) {
-            val videoURI = getFullVideoURI(videoName, context)
+            val videoURI = getFullVideoPath(videoName, context)
             val myFile = File(videoURI)
             Log.i(TAG, "deleteVideo: file $videoName existence = ${myFile.exists()}")
             if (myFile.exists()) myFile.delete()

@@ -1,5 +1,6 @@
 package com.dmytroa.findanime.fragments.search
 
+import android.content.ContentProvider
 import android.content.ContentValues
 import android.content.Intent
 import android.graphics.Canvas
@@ -252,6 +253,7 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
     }
 
     override fun onImageClick(imageUri: Uri) {
+
         viewModel.createNewAnimeSearchRequest(imageUri)
     }
 
@@ -281,33 +283,6 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
         }
     }
 
-    // FileProvider's uri sends video as a file to telegram
-    // https://stackoverflow.com/a/63600425/15225582
-    private fun getVideoContentUri(videoFile: File): Uri? {
-
-        val cursor = context?.contentResolver?.query(
-            MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
-            arrayOf(MediaStore.Video.Media._ID),
-            "${MediaStore.Video.Media.DISPLAY_NAME} = ? AND ${MediaStore.Video.Media.DATA} like ?",
-            arrayOf(videoFile.name, "%/Find Anime/%"),
-            null)
-
-        val uri: Uri? = if (cursor != null && cursor.moveToFirst()) {
-            val id = cursor.getInt(cursor.getColumnIndex(MediaStore.MediaColumns._ID))
-            Uri.withAppendedPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, "$id")
-        } else if (videoFile.exists()) {
-            val values = ContentValues()
-            values.put(MediaStore.Video.Media.DISPLAY_NAME, videoFile.name)
-            context?.contentResolver?.insert(
-                MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
-        } else {
-            null
-        }
-
-        cursor?.close()
-        return uri
-    }
-
     private fun shareItem(id: Long) {
         CoroutineScope(Dispatchers.IO).launch {
             viewModel.getSearchItemById(id).videoFileName?.let { shareItem(it) }
@@ -316,33 +291,24 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
 
     private fun shareItem(fileName: String) {
         Log.i(TAG, "shareItem: ")
-        val videoContentUri = FileProvider.getUriForFile(requireContext(),
-            "${activity?.applicationContext?.packageName}.provider",
-            File(LocalFilesRepository.getFullVideoURI(fileName, requireContext()))
+
+        val originalFile = File(LocalFilesRepository.getFullVideoPath(fileName, requireContext()))
+
+        val uri = LocalFilesRepository.createTemporaryCopyInPublicStorage(
+            originalFile,
+            requireContext()
         )
-        Log.i("TAG", "shareItem: $videoContentUri")
 
-//        val fileInExternalDir = File(LocalFilesRepository.getVideoDirPath(requireContext()), fileName)
-//        val saveCopy =
-//            LocalFilesRepository.saveVideoToPublicStorage(
-//                fileInExternalDir,
-//                "tmp",
-//                requireContext()
-//            ) ?: return
-//        Log.i(TAG, "shareItem: ${saveCopy.path}")
-        Log.i("TAG", "shareItem: $videoContentUri")
-
+        Log.i(TAG, "shareItem: $uri")
         val shareIntent: Intent = Intent().apply {
             action = Intent.ACTION_SEND
             flags =  Intent.FLAG_GRANT_READ_URI_PERMISSION
-            putExtra(
-                Intent.EXTRA_STREAM,
-                videoContentUri
-            )
+            putExtra(Intent.EXTRA_STREAM, uri)
             type = "video/mp4"
         }
         startActivity(Intent.createChooser(shareIntent, resources.getText(R.string.send_to)))
     }
+
     private fun deleteItem(id: Long) {
         CoroutineScope(Dispatchers.IO).launch {
             deleteItem(viewModel.getSearchItemById(id))

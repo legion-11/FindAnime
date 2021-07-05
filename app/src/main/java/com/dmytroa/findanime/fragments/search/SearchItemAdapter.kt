@@ -255,7 +255,7 @@ class SearchItemAdapter(
         }
 
         private fun loadVideo(item: SearchItem) {
-            val videoURI = item.videoFileName?.let { LocalFilesRepository.getFullVideoURI(it, recyclerView.context) }
+            val videoURI = item.videoFileName?.let { LocalFilesRepository.getFullVideoPath(it, recyclerView.context) }
 
             if (videoURI == null) {
                 Log.i("SearchItemAdapter", "loadVideo: fail videoURI == null $item")
@@ -350,7 +350,7 @@ class SearchItemAdapter(
                 thumbnailImageView -> {
                     Log.i("TAG", "bind: loading video ")
                     item.searchItem.let {
-                        val fullURI = item.searchItem.videoFileName?.let { LocalFilesRepository.getFullVideoURI(it, recyclerView.context) }
+                        val fullURI = item.searchItem.videoFileName?.let { LocalFilesRepository.getFullVideoPath(it, recyclerView.context) }
                         fullURI?.let {
                             videoView.setVideoURI(Uri.fromFile(File(it)))
                         }
