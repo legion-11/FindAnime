@@ -32,12 +32,12 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
     val items: LiveData<Array<SearchItemWithSelectedResult>> = repository.getAll().asLiveData()
 
     //not allowing enqueue more than 1 search call
-    private val semaphoreImageDownloadConcurrencyLimit = Semaphore(1,0)
-    private val semaphoreForCheckingImageCalls = Semaphore(1,0)
+    private val semaphoreConcurrencyLimit = Semaphore(1,0)
+    private val semaphoreForCheckingCalls = Semaphore(1,0)
     private val semaphoreVideoCall = Semaphore(1,0)
 
     private val calls: MutableList<Pair<Call<*>, Long>> = mutableListOf()
-    private val finishedImagesCalls = mutableListOf<Long>()
+    private val finishedSearchCalls = mutableListOf<Long>()
 
     suspend fun insert(searchItem: SearchItem): Long = repository.insert(searchItem)
 
@@ -53,13 +53,62 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
         repository.setIsBookmarked(item, b)
     }
 
+    fun createNewAnimeSearchRequest(url: String) {
+        viewModelScope.launch {
+                val newItem = SearchItem(url, null)
+                val newId = insert(newItem)
+                newItem.id = newId
+                searchByUrl(url, newItem)
+        }
+    }
+    private suspend fun searchByUrl(url: String, searchItemToUpdate: SearchItem) {
+        semaphoreForCheckingCalls.acquire()
+        if (calls.map { it.second }.contains(searchItemToUpdate.id)
+            || finishedSearchCalls.contains(searchItemToUpdate.id)) {
+            semaphoreForCheckingCalls.release()
+            return
+        }
+
+        val call = searchService.searchByUrl(url)
+        calls.add(Pair(call, searchItemToUpdate.id))
+        semaphoreConcurrencyLimit.acquire()
+        call.enqueue(object : Callback<SearchByImageRequestResult> {
+            override fun onResponse(
+                call: Call<SearchByImageRequestResult>,
+                response: Response<SearchByImageRequestResult>
+            ) {
+                val responseBody = response.body()
+                if (responseBody != null) {
+                    updateSearchItemWithNewData(responseBody, searchItemToUpdate)
+                } else {
+                    delete(searchItemToUpdate)
+                    Log.i(TAG, "searchByImage.onResponse: response. unsuccessful")
+                }
+                finishedSearchCalls.add(searchItemToUpdate.id)
+                calls.remove(Pair(call, searchItemToUpdate.id))
+                semaphoreConcurrencyLimit.release()
+            }
+
+            override fun onFailure(call: Call<SearchByImageRequestResult>, t: Throwable) {
+                Log.i(TAG, "${t.message}")
+                if (call.isCanceled){
+                    delete(searchItemToUpdate)
+                } else {
+                    Log.i(TAG, "searchByImage.onFailure: response.isUnsuccessful")
+                }
+                calls.remove(Pair(call, searchItemToUpdate.id))
+                semaphoreConcurrencyLimit.release()
+            }
+        })
+        semaphoreForCheckingCalls.release()
+    }
 
     fun createNewAnimeSearchRequest(imageUri: Uri) {
         viewModelScope.launch {
             Log.i(TAG, "createNewAnimeSearchRequest: calls size = ${calls.size}")
             val imageCopyName = LocalFilesRepository.copyImageToCacheDir(imageUri, getApplication())
             if (imageCopyName != null) {
-                val newItem = SearchItem(imageCopyName)
+                val newItem = SearchItem(null, imageCopyName)
                 val newId = insert(newItem)
                 newItem.id = newId
                 //<--- stop 1
@@ -73,10 +122,10 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
 
     private suspend fun searchByImage(copyOfImageUri: String,
                                       searchItemToUpdate: SearchItem) {
-        semaphoreForCheckingImageCalls.acquire()
+        semaphoreForCheckingCalls.acquire()
         if (calls.map { it.second }.contains(searchItemToUpdate.id)
-            || finishedImagesCalls.contains(searchItemToUpdate.id)) {
-            semaphoreForCheckingImageCalls.release()
+            || finishedSearchCalls.contains(searchItemToUpdate.id)) {
+            semaphoreForCheckingCalls.release()
             return
         }
 
@@ -84,7 +133,7 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
 
         if (!File(fullImageUri).exists()) {
             delete(searchItemToUpdate)
-            semaphoreForCheckingImageCalls.release()
+            semaphoreForCheckingCalls.release()
             return
         }
 
@@ -92,7 +141,7 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
         val call = searchService.searchByImage(body)
         calls.add(Pair(call, searchItemToUpdate.id))
 
-        semaphoreImageDownloadConcurrencyLimit.acquire()
+        semaphoreConcurrencyLimit.acquire()
         call.enqueue(object : Callback<SearchByImageRequestResult> {
             override fun onResponse(
                 call: Call<SearchByImageRequestResult>,
@@ -105,9 +154,9 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
                 } else {
                     Log.i(TAG, "searchByImage.onResponse: response.isUnsuccessful")
                 }
-                finishedImagesCalls.add(searchItemToUpdate.id)
+                finishedSearchCalls.add(searchItemToUpdate.id)
                 calls.remove(Pair(call, searchItemToUpdate.id))
-                semaphoreImageDownloadConcurrencyLimit.release()
+                semaphoreConcurrencyLimit.release()
             }
 
             override fun onFailure(call: Call<SearchByImageRequestResult>, t: Throwable) {
@@ -118,10 +167,10 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
                     Log.i(TAG, "searchByImage.onFailure: response.isUnsuccessful")
                 }
                 calls.remove(Pair(call, searchItemToUpdate.id))
-                semaphoreImageDownloadConcurrencyLimit.release()
+                semaphoreConcurrencyLimit.release()
             }
         })
-        semaphoreForCheckingImageCalls.release()
+        semaphoreForCheckingCalls.release()
     }
 
     private fun prepareMultipart(uri: String):  MultipartBody.Part {
@@ -160,6 +209,7 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
             val newInstance = searchItemToUpdate.apply {
                 selectedResultId = repository.insertAllAndReturnIdOfFirst(listToInsert)
                 imageFileName = null
+                url = null
             }
 
             repository.update(newInstance)
@@ -185,7 +235,11 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
                 item.searchItem.imageFileName?.let {
                     searchByImage(it, item.searchItem.copy())
                 } ?: run {
-                    delete(item.searchItem)
+                    item.searchItem.url?.let {
+                        searchByUrl(it, item.searchItem.copy())
+                    } ?: run {
+                        delete(item.searchItem)
+                    }
                 }
             }
         }

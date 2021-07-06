@@ -6,12 +6,15 @@ import androidx.room.PrimaryKey
 @Entity
 data class SearchItem(
     @PrimaryKey(autoGenerate = true) var id: Long,
+    var url: String?, //without filesDir + separator
     var imageFileName: String?, //without filesDir + separator
     var videoFileName: String?, //without externalFilesDir + separator
     var selectedResultId: Long?,
     var isBookmarked: Boolean = false,
     ){
-    constructor(imageURI: String): this(0, imageURI,null, null, false)
+    constructor(url: String?, imageURI: String?):
+            this(0,url, imageURI,null, null, false)
+
     val isFinished
         get() = videoFileName != null
 

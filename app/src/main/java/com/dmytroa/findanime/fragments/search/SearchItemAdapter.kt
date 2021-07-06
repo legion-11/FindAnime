@@ -57,6 +57,7 @@ class SearchItemAdapter(
         lastSelectedViewHolder?.changeStrokeColor()
     }
 
+
     override fun onAttachedToRecyclerView(recyclerView: RecyclerView) {
         super.onAttachedToRecyclerView(recyclerView)
         this.recyclerView = recyclerView
@@ -190,8 +191,9 @@ class SearchItemAdapter(
             buttonsContainer.layout = R.layout.default_buttons_layout
 
             //resize to save aspect ratio
-            videoView.setOnPreparedListener { mp -> //Get your video's width and height
+            videoView.setOnPreparedListener { mp ->
                 resizeVideo(mp)
+                mp.start()
                 showVideoViewOnceVideoIsFullyPrepared(mp)
             }
         }
@@ -220,26 +222,28 @@ class SearchItemAdapter(
             layoutParams.width = scaledWidth.toInt()
             layoutParams.height = scaledHeight.toInt()
             videoView.layoutParams = layoutParams
-            videoView.start()
         }
 
         private fun showVideoViewOnceVideoIsFullyPrepared(mp: MediaPlayer?) {
             CoroutineScope(Dispatchers.IO).launch {
                 var started = false
-                while (!started) {
+                var counter = 0
+                while (!started || counter < 100) {
                     try {
                         if (mp != null && mp.currentPosition > 0) {
-                            withContext(Dispatchers.Main) {
-                                videoView.alpha = 1f
-                                thumbnailImageView.visibility = View.GONE
-                                started = true
-                                return@withContext
-                            }
+                            break
                         }
                         delay(10)
+                        counter += 1
                     } catch (e : IllegalStateException) {
-                        return@launch
+                        break
                     }
+                }
+                withContext(Dispatchers.Main) {
+                    videoView.alpha = 1f
+                    thumbnailImageView.visibility = View.GONE
+                    started = true
+                    return@withContext
                 }
             }
         }
@@ -263,6 +267,7 @@ class SearchItemAdapter(
                 thumbnailImageView.setImageDrawable(null)
                 return
             }
+
             videoView.isFocusable = false
             thumbnailImageView.bringToFront()
 

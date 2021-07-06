@@ -1,19 +1,16 @@
 package com.dmytroa.findanime.fragments.search
 
-import android.content.ContentProvider
-import android.content.ContentValues
+import android.content.Context
 import android.content.Intent
 import android.graphics.Canvas
 import android.net.Uri
 import android.os.Bundle
-import android.provider.MediaStore
 import android.util.Log
 import android.util.TypedValue
 import android.view.*
 import android.widget.*
 import androidx.appcompat.view.ActionMode
 import androidx.core.content.ContextCompat
-import androidx.core.content.FileProvider
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.ViewModelProvider
@@ -29,9 +26,8 @@ import com.dmytroa.findanime.R
 import com.dmytroa.findanime.dataClasses.roomDBEntity.SearchItem
 import com.dmytroa.findanime.dataClasses.roomDBEntity.SearchItemWithSelectedResult
 import com.dmytroa.findanime.databinding.FragmentSearchBinding
-import com.dmytroa.findanime.fragments.imageDrawer.ImageDrawerListDialogFragment
+import com.dmytroa.findanime.fragments.SharedInterfaces
 import com.dmytroa.findanime.repositories.LocalFilesRepository
-import com.dmytroa.findanime.shared.OnFragmentListener
 import com.dmytroa.findanime.shared.SharedViewModel
 import com.dmytroa.findanime.shared.Utils
 import it.xabaras.android.recyclerview.swipedecorator.RecyclerViewSwipeDecorator
@@ -43,7 +39,7 @@ import java.util.*
 /**
  * A simple [Fragment] subclass as the default destination in the navigation.
  */
-class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickListener,
+class SearchFragment : Fragment(), Interfaces.SubmitSearchRequest,
     SearchItemAdapter.OnSearchAdapterItemClickListener {
     private val binding get() = _binding!!
     private var _binding: FragmentSearchBinding? = null
@@ -51,6 +47,8 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
     private val sharedViewModel: SharedViewModel by activityViewModels()
     private var searchAdapter: SearchItemAdapter? = null
     private var bookmarksMenuItem: MenuItem? = null
+    private lateinit var fragmentListener: SharedInterfaces.FragmentListener
+
 
     private val onScrollListener = object : RecyclerView.OnScrollListener() {
 
@@ -59,15 +57,15 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
             Log.i("TAG", "onScrollStateChanged: $newState ")
             when(newState) {
                 SCROLL_STATE_DRAGGING -> {
-                    (requireActivity() as OnFragmentListener).hideFab()
+                    fragmentListener.hideMainFab()
                 }
                 SCROLL_STATE_IDLE -> {
                     // do not show button at the bottom position
                     if (!recyclerView.canScrollVertically(1) &&
                         recyclerView.canScrollVertically(-1)) {
-                        (requireActivity() as OnFragmentListener).showFab()
+                        fragmentListener.showMainFab()
                     } else {
-                        (requireActivity() as OnFragmentListener).showFab()
+                        fragmentListener.showMainFab()
                     }
                 }
                 else -> {}
@@ -176,6 +174,16 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
         }
     }
 
+
+    override fun onAttach(context: Context) {
+        super.onAttach(context)
+        try {
+            fragmentListener = context as SharedInterfaces.FragmentListener
+        }catch(e: RuntimeException){
+            throw RuntimeException(activity.toString()+" must implement method");
+        }
+    }
+
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?,
                               savedInstanceState: Bundle?): View {
         Log.i(TAG, "onCreateView: ")
@@ -187,6 +195,7 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
         ).get(SearchFragmentViewModel::class.java)
 
         _binding = FragmentSearchBinding.inflate(inflater, container, false)
+
         return binding.root
     }
 
@@ -202,8 +211,10 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
                 viewModel.replaceWithNewVideo(searchItemId, newResult)
             }
         }
+        fragmentListener.setupFab(android.R.drawable.ic_input_add) {
+            fragmentListener.hideShowExtraFabsFunction()
+        }
 
-        (requireActivity() as OnFragmentListener).setSearchFragmentFun()
         binding.searchResultRecyclerView.layoutManager = LinearLayoutManager(context)
         binding.searchResultRecyclerView.setHasFixedSize(true)
 
@@ -252,9 +263,17 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
         }
     }
 
-    override fun onImageClick(imageUri: Uri) {
-
+    override fun onPause() {
+        // by doing so we can stop all mediaPlayers that were running at the moment
+        searchAdapter?.notifyDataSetChanged()
+        super.onPause()
+    }
+    override fun imageRequest(imageUri: Uri) {
         viewModel.createNewAnimeSearchRequest(imageUri)
+    }
+
+    override fun urlRequest(url: String) {
+        viewModel.createNewAnimeSearchRequest(url)
     }
 
     override fun openMal(idMal: Int) {
@@ -328,17 +347,13 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
         const val TAG = "SearchFragment"
     }
 
-    interface OnCreateToolbar {
-        fun prepareToolbar(resId: Int, searchViewIsVisible: Boolean)
-        fun openDrawer()
-    }
 
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
         inflater.inflate(R.menu.menu_main, menu)
         bookmarksMenuItem = menu.findItem(R.id.action_filter_bookmarks)
         bookmarksMenuItem!!.isChecked = sharedViewModel.bookmarksIsChecked
         if (sharedViewModel.bookmarksIsChecked) { bookmarksMenuItem!!.setIcon(R.drawable.ic_baseline_bookmark_24) }
-        (requireActivity() as OnCreateToolbar).prepareToolbar(R.drawable.ic_baseline_menu_24, true)
+        (requireActivity() as SharedInterfaces.OnCreateToolbar).prepareToolbar(R.drawable.ic_baseline_menu_24, true)
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
@@ -354,11 +369,10 @@ class SearchFragment : Fragment(), ImageDrawerListDialogFragment.OnImageClickLis
                 true
             }
             android.R.id.home -> {
-                (requireActivity() as OnCreateToolbar).openDrawer()
+                (requireActivity() as SharedInterfaces.OnCreateToolbar).openDrawer()
                 true
             }
             else -> super.onOptionsItemSelected(item)
         }
     }
-
 }

@@ -1,5 +1,6 @@
 package com.dmytroa.findanime.shared
 
+import android.net.Uri
 import android.os.Build
 import android.util.DisplayMetrics
 import android.util.TypedValue
@@ -39,4 +40,5 @@ object Utils {
 
     fun getVisibleHeight(activity: FragmentActivity): Int =
         getDisplayMetrics(activity).heightPixels - getStatusBarHeight(activity) - getToolbarBarHeight(activity)
+
 }

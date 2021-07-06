@@ -1,4 +1,4 @@
-package com.dmytroa.findanime.fragments
+package com.dmytroa.findanime.fragments.settings
 
 import android.os.Bundle
 import android.view.Menu
@@ -7,6 +7,7 @@ import android.view.MenuItem
 import androidx.navigation.fragment.findNavController
 import androidx.preference.PreferenceFragmentCompat
 import com.dmytroa.findanime.R
+import com.dmytroa.findanime.fragments.SharedInterfaces
 import com.dmytroa.findanime.fragments.search.SearchFragment
 
 
@@ -24,7 +25,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
         menu.clear()
         //androidx.appcompat.R.drawable.abc_ic_ab_back_material
-        (requireActivity() as SearchFragment.OnCreateToolbar)
+        (requireActivity() as SharedInterfaces.OnCreateToolbar)
             .prepareToolbar(androidx.appcompat.R.drawable.abc_ic_ab_back_material, false)
     }
 

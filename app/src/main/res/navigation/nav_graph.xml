@@ -32,6 +32,6 @@
     </fragment>
     <fragment
         android:id="@+id/SettingsFragment"
-        android:name="com.dmytroa.findanime.fragments.SettingsFragment"
+        android:name="com.dmytroa.findanime.fragments.settings.SettingsFragment"
         android:label="SettingsFragment" />
 </navigation>

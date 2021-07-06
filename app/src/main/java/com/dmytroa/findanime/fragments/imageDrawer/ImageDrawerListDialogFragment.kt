@@ -198,7 +198,7 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
         if (requestCode == RESULT_LOAD_IMG && resultCode == RESULT_OK) {
             val imageUri = data?.data
             if (imageUri != null) {
-                listener.onImageClick(imageUri)
+                listener.onDrawerImageClick(imageUri)
                 dismiss()
             } else {
                 Toast.makeText(activity, "Something went wrong", Toast.LENGTH_LONG).show()
@@ -285,7 +285,7 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
 
         override fun onClick(v: View?) {
             val imageUri = Uri.withAppendedPath(uriExternal, imagesIds[bindingAdapterPosition].toString())
-            listener.onImageClick(imageUri)
+            listener.onDrawerImageClick(imageUri)
             dismiss()
         }
     }
@@ -311,7 +311,7 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
 
     /** callback for click on ViewHolder */
     interface OnImageClickListener {
-        fun onImageClick(imageUri: Uri)
+        fun onDrawerImageClick(imageUri: Uri)
     }
 
     override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {

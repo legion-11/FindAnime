@@ -10,6 +10,8 @@ class SharedViewModel : ViewModel() {
     var newSelectedResult: SearchResult? = null
     var makeReplacement = false
 
+    var extraFabsIsExpanded = false
+
     val filterText: MutableLiveData<String> = MutableLiveData("")
     val filterBookmarks: MutableLiveData<Boolean> = MutableLiveData(false)
     var bookmarksIsChecked = false

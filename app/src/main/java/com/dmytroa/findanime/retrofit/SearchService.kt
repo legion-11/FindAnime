@@ -15,6 +15,9 @@ interface SearchService {
     @POST("/search?anilistInfo")
     fun searchByImage(@Part image: MultipartBody.Part) : Call<SearchByImageRequestResult>
 
+    @GET("/search?anilistInfo")
+    fun searchByUrl(@Query("url") url: String) : Call<SearchByImageRequestResult>
+
     @GET("/me")
     fun getQuota() : Call<Quota>
 
