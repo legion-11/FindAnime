@@ -1,7 +1,11 @@
 package com.dmytroa.findanime.fragments.search
 
 import android.app.Application
+import android.app.RecoverableSecurityException
+import android.content.Context
+import android.content.IntentSender
 import android.net.Uri
+import android.os.Build
 import android.util.Log
 import androidx.lifecycle.*
 import com.dmytroa.findanime.FindAnimeApplication
@@ -30,6 +34,13 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
     private val repository: LocalFilesRepository = (application as FindAnimeApplication).repository
 
     val items: LiveData<Array<SearchItemWithSelectedResult>> = repository.getAll().asLiveData()
+
+    private val _uriToShare = MutableLiveData<Uri?>()
+    val uriToShare: LiveData<Uri?> = _uriToShare
+
+    private var pendingImage: String? = null
+    private val _permissionNeededForUpdate = MutableLiveData<IntentSender?>()
+    val permissionNeededForUpdate: LiveData<IntentSender?> = _permissionNeededForUpdate
 
     //not allowing enqueue more than 1 search call
     private val semaphoreConcurrencyLimit = Semaphore(1,0)
@@ -328,6 +339,42 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
             }
         }
         return false
+    }
+
+    fun share(fileName: String, context: Context) {
+        Log.i(TAG, "share: $fileName")
+        val originalFile = File(LocalFilesRepository.getFullVideoPath(fileName, context))
+        try {
+            val uri = LocalFilesRepository.createTemporaryCopyInPublicStorage(
+                originalFile,
+                context
+            )
+            Log.i(TAG, "share: $uri", )
+            _uriToShare.postValue(uri)
+        } catch (securityException: SecurityException) {
+            Log.i(TAG, "share: securityException", )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val recoverableSecurityException =
+                    securityException as? RecoverableSecurityException
+                        ?: throw securityException
+
+                // Signal to the Activity that it needs to request permission and
+                // try the share again if it succeeds.
+                pendingImage = fileName
+                _permissionNeededForUpdate.postValue(
+                    recoverableSecurityException.userAction.actionIntent.intentSender
+                )
+            } else {
+                throw securityException
+            }
+        }
+    }
+
+    fun deletePendingImage(context: Context) {
+        pendingImage?.let { image ->
+            pendingImage = null
+            share(image, context)
+        }
     }
 
     class SearchFragmentViewModelFactory(private val application: Application) : ViewModelProvider.Factory {

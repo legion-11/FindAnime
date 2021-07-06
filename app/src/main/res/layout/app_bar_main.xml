@@ -53,25 +53,21 @@
         android:layout_height="wrap_content"
         android:layout_marginBottom="90dp"
         android:contentDescription="create new search request"
-        android:visibility="invisible"
         app:fabSize="mini"
         app:layout_anchor="@id/floatingActionButton"
         app:layout_anchorGravity="center_horizontal"
-        app:srcCompat="@drawable/ic_gallery"
-        tools:visibility="visible" />
+        app:srcCompat="@drawable/ic_gallery" />
 
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/floatingActionButtonFromUrl"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:contentDescription="create new search request"
-        android:visibility="invisible"
-        app:fabSize="mini"
         android:layout_marginEnd="90dp"
+        android:contentDescription="create new search request"
+        app:fabSize="mini"
         app:layout_anchor="@id/floatingActionButton"
         app:layout_anchorGravity="center_vertical"
-        app:srcCompat="@drawable/ic_baseline_link_24"
-        tools:visibility="visible" />
+        app:srcCompat="@drawable/ic_baseline_link_24" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

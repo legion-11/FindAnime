@@ -35,7 +35,7 @@ import com.dmytroa.findanime.dataClasses.retrofit.Quota
 import com.dmytroa.findanime.fragments.SharedInterfaces
 import com.dmytroa.findanime.fragments.imageDrawer.ImageDrawerListDialogFragment
 import com.dmytroa.findanime.fragments.search.Interfaces
-import com.dmytroa.findanime.fragments.search.SearchFragment.Companion.REQUEST_PERMISSION
+import com.dmytroa.findanime.fragments.search.SearchFragment.Companion.READ_MEDIA_PERMISSION_REQUEST
 import com.dmytroa.findanime.repositories.LocalFilesRepository
 import com.dmytroa.findanime.retrofit.RetrofitInstance
 import com.dmytroa.findanime.retrofit.SearchService
@@ -67,7 +67,6 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
 
     private lateinit var animationFwd: Animation
     private lateinit var animationBwd: Animation
-
 
     private lateinit var toolbar: Toolbar
     private lateinit var searchView: SearchView
@@ -116,10 +115,6 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
 
         LocalFilesRepository.createNoMediaFile(this)
         clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        if (extraFabsIsExpanded)
-            showExtraFabs()
-        else
-            hideExtraFabs()
     }
 
 
@@ -193,7 +188,7 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
     private fun requestPermission(){
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this,  arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE),
-                REQUEST_PERMISSION
+                READ_MEDIA_PERMISSION_REQUEST
             )
             return
         } else {
@@ -208,7 +203,7 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQUEST_PERMISSION) {
+        if (requestCode == READ_MEDIA_PERMISSION_REQUEST) {
             if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 showImageDrawerListDialogFragment()
             } else {
@@ -255,15 +250,23 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
         get() = sharedViewModel.extraFabsIsExpanded
         set(value) {sharedViewModel.extraFabsIsExpanded = value}
 
-
-    override fun hideExtraFabs() {
-        fabImages.hide()
-        fabUrl.hide()
+    override fun restoreDefaultState() {
+        if (extraFabsIsExpanded) {
+            fabMain.startAnimation(animationBwd)
+            fabImages.hide()
+            fabUrl.hide()
+        }
     }
 
-    override fun showExtraFabs() {
-        fabImages.show()
-        fabUrl.show()
+    override fun restoreExpandableState() {
+        if (extraFabsIsExpanded) {
+            fabMain.startAnimation(animationFwd)
+            fabImages.show()
+            fabUrl.show()
+        } else {
+            fabImages.hide()
+            fabUrl.hide()
+        }
     }
 
     override fun hideMainFab() {
@@ -288,12 +291,13 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
 
     override fun hideShowExtraFabsFunction() {
         extraFabsIsExpanded = if (extraFabsIsExpanded) {
-            hideExtraFabs()
+            fabImages.hide()
+            fabUrl.hide()
             fabMain.startAnimation(animationBwd)
-
             false
         } else {
-            showExtraFabs()
+            fabImages.show()
+            fabUrl.show()
             fabMain.startAnimation(animationFwd)
             true
         }

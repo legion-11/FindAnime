@@ -1,5 +1,6 @@
 package com.dmytroa.findanime.fragments.search
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.graphics.Canvas
@@ -27,12 +28,11 @@ import com.dmytroa.findanime.dataClasses.roomDBEntity.SearchItem
 import com.dmytroa.findanime.dataClasses.roomDBEntity.SearchItemWithSelectedResult
 import com.dmytroa.findanime.databinding.FragmentSearchBinding
 import com.dmytroa.findanime.fragments.SharedInterfaces
-import com.dmytroa.findanime.repositories.LocalFilesRepository
 import com.dmytroa.findanime.shared.SharedViewModel
 import com.dmytroa.findanime.shared.Utils
+import com.google.android.material.snackbar.Snackbar
 import it.xabaras.android.recyclerview.swipedecorator.RecyclerViewSwipeDecorator
 import kotlinx.coroutines.*
-import java.io.File
 import java.util.*
 
 
@@ -104,7 +104,7 @@ class SearchFragment : Fragment(), Interfaces.SubmitSearchRequest,
                     true
                 }
                 R.id.action_share -> {
-                    sharedViewModel.selectedItemId.value?.let { shareItem(it) }
+                    sharedViewModel.selectedItemId.value?.let { shareItemById(it) }
                     true
                 }
                 else -> false
@@ -133,7 +133,7 @@ class SearchFragment : Fragment(), Interfaces.SubmitSearchRequest,
             when(direction) {
                 ItemTouchHelper.LEFT -> {
                     searchAdapter?.notifyItemChanged(viewHolder.bindingAdapterPosition)
-                    item?.searchItem?.id?.let { shareItem(it) }
+                    item?.searchItem?.id?.let { shareItemById(it) }
                 }
                 ItemTouchHelper.RIGHT -> {
                     if (item != null) { deleteItem(item.searchItem) }
@@ -211,9 +211,11 @@ class SearchFragment : Fragment(), Interfaces.SubmitSearchRequest,
                 viewModel.replaceWithNewVideo(searchItemId, newResult)
             }
         }
+
         fragmentListener.setupFab(android.R.drawable.ic_input_add) {
             fragmentListener.hideShowExtraFabsFunction()
         }
+        fragmentListener.restoreExpandableState()
 
         binding.searchResultRecyclerView.layoutManager = LinearLayoutManager(context)
         binding.searchResultRecyclerView.setHasFixedSize(true)
@@ -244,6 +246,33 @@ class SearchFragment : Fragment(), Interfaces.SubmitSearchRequest,
         sharedViewModel.selectedItemId.observe(viewLifecycleOwner, { id ->
             showOrCloseContextualActionBar(id != null)
             searchAdapter?.selectedItemId = id
+        })
+
+        viewModel.permissionNeededForUpdate.observe(viewLifecycleOwner, { intentSender ->
+            intentSender?.let {
+                // On Android 10+, if the app doesn't have permission to modify
+                // or delete an item, it returns an `IntentSender` that we can
+                // use here to prompt the user to grant permission to delete (or modify)
+                // the image.
+                startIntentSenderForResult(
+                    intentSender,
+                    UPDATE_PERMISSION_REQUEST,
+                    null,
+                    0,
+                    0,
+                    0,
+                    null
+                )
+            }
+        })
+
+        viewModel.uriToShare.observe(viewLifecycleOwner, { uri ->
+            Log.i(TAG, "onViewCreated: uriToShare $uri")
+            uri?.let {
+                share(it)
+            } ?: run {
+                fragmentListener.showSnackBar()
+            }
         })
 
         binding.searchResultRecyclerView.addOnScrollListener(onScrollListener)
@@ -302,22 +331,17 @@ class SearchFragment : Fragment(), Interfaces.SubmitSearchRequest,
         }
     }
 
-    private fun shareItem(id: Long) {
+    private fun shareItemById(id: Long) {
         CoroutineScope(Dispatchers.IO).launch {
-            viewModel.getSearchItemById(id).videoFileName?.let { shareItem(it) }
+            viewModel.getSearchItemById(id).videoFileName?.let { shareWithUriInMediaStorage(it) }
         }
     }
 
-    private fun shareItem(fileName: String) {
-        Log.i(TAG, "shareItem: ")
+    private fun shareWithUriInMediaStorage(fileName: String) {
+        viewModel.share(fileName, requireContext())
+    }
 
-        val originalFile = File(LocalFilesRepository.getFullVideoPath(fileName, requireContext()))
-
-        val uri = LocalFilesRepository.createTemporaryCopyInPublicStorage(
-            originalFile,
-            requireContext()
-        )
-
+    private fun share(uri: Uri) {
         Log.i(TAG, "shareItem: $uri")
         val shareIntent: Intent = Intent().apply {
             action = Intent.ACTION_SEND
@@ -342,8 +366,16 @@ class SearchFragment : Fragment(), Interfaces.SubmitSearchRequest,
         viewModel.delete(searchItem)
     }
 
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (resultCode == Activity.RESULT_OK && requestCode == UPDATE_PERMISSION_REQUEST) {
+            viewModel.deletePendingImage(requireContext())
+        }
+    }
+
     companion object {
-        const val REQUEST_PERMISSION = 100
+        const val READ_MEDIA_PERMISSION_REQUEST = 100
+        const val UPDATE_PERMISSION_REQUEST = 200
         const val TAG = "SearchFragment"
     }
 

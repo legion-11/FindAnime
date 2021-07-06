@@ -5,6 +5,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.os.Environment
 import android.os.ParcelFileDescriptor
 import android.provider.MediaStore
@@ -194,11 +195,81 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
                 val uri = findCreatedTemporaryUri(context, fileName, TEMPORARY_DIR_Q)
                 copyVideoQAndAbove(context, file, uri, fileName, TEMPORARY_DIR_Q)
             } else {
-
                 val uri = findCreatedTemporaryUri(context, fileName, TEMPORARY_DIR_BELOWQ)
                 copyVideoBelowQ(context, file, uri, fileName, TEMPORARY_DIR_BELOWQ)
             }
         }
+
+        private fun showAllUri(context: Context) {
+            val collection = if(Build.VERSION.SDK_INT >= 29) {
+                MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+            } else {
+                MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+            }
+            val pathcol = if(Build.VERSION.SDK_INT >= 29) {
+                MediaStore.Video.Media.RELATIVE_PATH
+            } else {
+                MediaStore.Video.Media.DATA
+            }
+
+            context.contentResolver.query(
+                collection,
+                arrayOf(MediaStore.Video.Media._ID,
+                    MediaStore.Video.Media.TITLE,
+                    pathcol
+                ),
+                null,
+                null,
+                null
+            ).use { cursor ->
+                 if (cursor != null && cursor.moveToFirst()) {
+                    do {
+                        val columnIndexID = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
+                        val id = cursor.getLong(columnIndexID)
+                        val columnIndexTitle = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.TITLE)
+                        val title = cursor.getString(columnIndexTitle)
+                        val columnIndexpath = cursor.getColumnIndexOrThrow(pathcol)
+                        val path2 = cursor.getString(columnIndexpath)
+
+                        Log.i(TAG, "showAllUri: " +
+                                "contentUri $id $path2 $title")
+                    } while (cursor.moveToNext())
+
+                } else {
+                    null
+                }
+            }
+        }
+
+        private fun deleteUri(context: Context, fileName: String, path: String) {
+            val collection = if(Build.VERSION.SDK_INT >= 29) {
+                MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+            } else {
+                MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+            }
+
+            val selection = if (Build.VERSION.SDK_INT >= 29) {
+                "${MediaStore.Video.Media.TITLE} = ? " +
+                        "AND " +
+                        "${MediaStore.Video.Media.RELATIVE_PATH} = ? "
+            } else {
+                "${MediaStore.Video.Media.TITLE} = ? " +
+                        "AND " +
+                        "${MediaStore.Video.Media.DATA} = ? "
+            }
+
+            val args = if (Build.VERSION.SDK_INT >= 29) {
+                arrayOf(fileName, path)
+            } else {
+                arrayOf(fileName, File(path, fileName).absolutePath)
+            }
+            context.contentResolver.delete(
+                collection,
+                selection,
+                args
+            )
+        }
+
 
         private fun findCreatedTemporaryUri(context: Context, fileName: String, path: String): Uri? {
             val collection = if(Build.VERSION.SDK_INT >= 29) {
@@ -208,10 +279,12 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
             }
 
             val selection = if (Build.VERSION.SDK_INT >= 29) {
-                "${MediaStore.Video.Media.TITLE} = ? AND " +
+                "${MediaStore.Video.Media.TITLE} = ? " +
+                        "AND " +
                         "${MediaStore.Video.Media.RELATIVE_PATH} = ? "
             } else {
-                "${MediaStore.Video.Media.TITLE} = ? AND " +
+                "${MediaStore.Video.Media.TITLE} = ? " +
+                        "AND " +
                         "${MediaStore.Video.Media.DATA} = ? "
             }
 
@@ -223,7 +296,8 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
 
             context.contentResolver.query(
                 collection,
-                arrayOf(MediaStore.Video.Media._ID),
+                arrayOf(MediaStore.Video.Media._ID
+                ),
                 selection,
                 args,
                 null
@@ -231,7 +305,9 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
                 return if (cursor != null && cursor.moveToFirst()) {
                     val columnIndexID = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
                     val id = cursor.getLong(columnIndexID)
-                    Log.i(TAG, "saveVideoQAndAbove: contentUri was already added $id $path $fileName")
+
+                    Log.i(TAG, "findCreatedTemporaryUri: " +
+                            "contentUri was already added $id $path $fileName")
                     Uri.withAppendedPath(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, "$id")
                 } else {
                     null
@@ -254,8 +330,9 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
                 context.contentResolver.update(uri, contentDetails, null, null)
                 uri
             } else {
+                deleteUri(context, fileName, relPath)
+                Log.i(TAG, "saveVideoQAndAbove: contentUri insert")
                 contentDetails.apply {
-                    Log.i(TAG, "saveVideoQAndAbove: contentUri insert")
                     put(MediaStore.Video.Media.DISPLAY_NAME, fileName)
                     put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
                     put(MediaStore.Video.Media.RELATIVE_PATH, relPath)
@@ -264,7 +341,6 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
                 context.contentResolver.insert(collection, contentDetails)
             }
 
-            Log.i(TAG, "saveVideoQAndAbove: $contentUri")
             return contentUri?.let { createdUri ->
                 try {
                     context.contentResolver.openFileDescriptor(createdUri, "w").use { pfd ->

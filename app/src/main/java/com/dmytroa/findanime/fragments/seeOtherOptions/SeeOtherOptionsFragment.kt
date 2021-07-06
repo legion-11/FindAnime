@@ -60,7 +60,7 @@ class SeeOtherOptionsFragment : Fragment(), OtherOptionsAdapter.OnItemClickListe
             sharedViewModel.newSelectedResult = viewModel.get(sharedViewModel.selectedItemId.value!!)?.searchResult
         }
 
-        fragmentListener.hideExtraFabs()
+        fragmentListener.restoreDefaultState()
         fragmentListener.setupFab(R.drawable.ic_baseline_check_24) {
             sharedViewModel.makeReplacement = true
             navigateBack()

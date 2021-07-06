@@ -11,17 +11,9 @@ object SharedInterfaces {
 
         fun hideMainFab()
         fun showMainFab()
-        fun hideExtraFabs()
-        fun showExtraFabs()
-        fun hideShowExtraFabsFunction() {
-            extraFabsIsExpanded = if (extraFabsIsExpanded) {
-                hideExtraFabs()
-                false
-            } else {
-                showExtraFabs()
-                true
-            }
-        }
+        fun restoreDefaultState()
+        fun restoreExpandableState()
+        fun hideShowExtraFabsFunction()
         fun showSnackBar()
         fun setupFab(fabIconRes: Int, function: () ->  Unit)
     }
