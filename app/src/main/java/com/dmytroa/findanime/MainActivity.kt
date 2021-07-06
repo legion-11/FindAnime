@@ -85,17 +85,12 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
         fabImages = findViewById(R.id.floatingActionButtonFromImage)
         fabUrl = findViewById(R.id.floatingActionButtonFromUrl)
 
-        fabImages.setOnClickListener {
-            requestPermission()
-        }
+        fabImages.setOnClickListener { requestPermission() }
 
-        fabUrl.setOnClickListener {
-            buildUrlInputDialog()
-        }
+        fabUrl.setOnClickListener { buildUrlInputDialog() }
 
         animationFwd = AnimationUtils.loadAnimation(this, R.anim.fab_rotate_fwd)
         animationBwd = AnimationUtils.loadAnimation(this, R.anim.fab_rotate_bwd)
-
         toolbar = findViewById(R.id.toolbar)
 
         setSupportActionBar(toolbar)
@@ -294,11 +289,12 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
     override fun hideShowExtraFabsFunction() {
         extraFabsIsExpanded = if (extraFabsIsExpanded) {
             hideExtraFabs()
-            fabMain.startAnimation(animationFwd)
+            fabMain.startAnimation(animationBwd)
+
             false
         } else {
             showExtraFabs()
-            fabMain.startAnimation(animationBwd)
+            fabMain.startAnimation(animationFwd)
             true
         }
     }

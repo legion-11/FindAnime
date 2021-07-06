@@ -242,7 +242,7 @@ class SearchFragment : Fragment(), Interfaces.SubmitSearchRequest,
         })
 
         sharedViewModel.selectedItemId.observe(viewLifecycleOwner, { id ->
-            showContextualActionBar(id != null)
+            showOrCloseContextualActionBar(id != null)
             searchAdapter?.selectedItemId = id
         })
 
@@ -254,7 +254,7 @@ class SearchFragment : Fragment(), Interfaces.SubmitSearchRequest,
         _binding = null
     }
 
-    fun showContextualActionBar(showMenuForSelection: Boolean) {
+    fun showOrCloseContextualActionBar(showMenuForSelection: Boolean) {
         if (showMenuForSelection) {
             if (mActionMode != null) return
             mActionMode = (requireActivity() as MainActivity).startSupportActionMode(mActionModeCallback)
