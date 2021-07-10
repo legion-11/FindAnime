@@ -9,6 +9,7 @@ import android.os.Build
 import android.util.Log
 import androidx.lifecycle.*
 import com.dmytroa.findanime.FindAnimeApplication
+import com.dmytroa.findanime.R
 import com.dmytroa.findanime.dataClasses.retrofit.SearchByImageRequestResult
 import com.dmytroa.findanime.dataClasses.roomDBEntity.SearchItem
 import com.dmytroa.findanime.dataClasses.roomDBEntity.SearchItemWithSelectedResult
@@ -16,6 +17,7 @@ import com.dmytroa.findanime.dataClasses.roomDBEntity.SearchResult
 import com.dmytroa.findanime.repositories.LocalFilesRepository
 import com.dmytroa.findanime.retrofit.RetrofitInstance
 import com.dmytroa.findanime.retrofit.SearchService
+import com.dmytroa.findanime.shared.Event
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -28,32 +30,69 @@ import retrofit2.Callback
 import retrofit2.Response
 import java.io.File
 
+/**
+ * viewModel for [com.dmytroa.findanime.fragments.search.SearchFragment]
+ */
 class SearchFragmentViewModel(application: Application) : AndroidViewModel(application) {
 
+    //retrofit service for calling trace.moe API
     private val searchService = RetrofitInstance.getInstance().create(SearchService::class.java)
     private val repository: LocalFilesRepository = (application as FindAnimeApplication).repository
 
     val items: LiveData<Array<SearchItemWithSelectedResult>> = repository.getAll().asLiveData()
 
-    private val _uriToShare = MutableLiveData<Uri?>()
-    val uriToShare: LiveData<Uri?> = _uriToShare
+    // uri from MediaStore of temporary created file in public storage
+    private val _uriToShare = MutableLiveData<Event<Uri?>>()
+    val uriToShare: LiveData<Event<Uri?>> = _uriToShare
 
-    private var pendingImage: String? = null
+    // if app is reinstalled, app looses rights to modify previously created files in publick storage
+    // so we have to save fileName of the new video while user gives permission
+    private var pendingVideo: String? = null
     private val _permissionNeededForUpdate = MutableLiveData<IntentSender?>()
     val permissionNeededForUpdate: LiveData<IntentSender?> = _permissionNeededForUpdate
 
     //not allowing enqueue more than 1 search call
+    // more at https://soruly.github.io/trace.moe-api/#/limits
     private val semaphoreConcurrencyLimit = Semaphore(1,0)
+
+    // do not allow checking calls executions while call is prepared or executing
     private val semaphoreForCheckingCalls = Semaphore(1,0)
     private val semaphoreVideoCall = Semaphore(1,0)
 
+    // list of all calls that are currently enqueued with corresponding to them SearchItem id
+    // call can be canceled using this list by knowing SearchItem id
     private val calls: MutableList<Pair<Call<*>, Long>> = mutableListOf()
     private val finishedSearchCalls = mutableListOf<Long>()
 
+    // live data for messages to be displayed via snack bar
+    val errorMessages = MutableLiveData<String>()
+
+    // error messages
+    val unsuccessfulApi =
+        getApplication<FindAnimeApplication>().resources.getString(R.string.error_response_body_empty)
+    private val hornyError =
+        getApplication<FindAnimeApplication>().resources.getString(R.string.error_legal_age)
+    private val gallerySaveError =
+        getApplication<FindAnimeApplication>().resources.getString(R.string.error_save_image)
+    private val unsuccessfullResults =
+        getApplication<FindAnimeApplication>().resources.getString(R.string.error_no_response_results)
+    val videoSaveError =
+        getApplication<FindAnimeApplication>().resources.getString(R.string.error_save_video)
+
+    /**
+     * insert [SearchItem] to database
+     */
     suspend fun insert(searchItem: SearchItem): Long = repository.insert(searchItem)
 
+    /**
+     * get [SearchItem] by it's id
+     */
     suspend fun getSearchItemById(id: Long) = repository.getSearchItemById(id)
 
+    /**
+     * remove [SearchItem] from database
+     * (also stops corresponding enqueued call)
+     */
     fun delete(searchItem: SearchItem) {
         Log.i(TAG, "delete: $searchItem")
         cancelCall(searchItem.id)
@@ -64,23 +103,69 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
         repository.setIsBookmarked(item, b)
     }
 
-    fun createNewAnimeSearchRequest(url: String) {
+    /**
+     * create new [SearchItem] and start new call to trace.moe API
+     * [See API](https://soruly.github.io/trace.moe-api/#/docs?id=search-by-image-url)
+     *
+     * @param url url to the image hosted somewhere in public domain
+     * @param size for future use in [getVideoPreview]
+     * @param mute for future use in [getVideoPreview]
+     * @param cutBlackBorders for future use in [getVideoPreview]
+     * @param showHContent for future use in [updateSearchItemWithNewData]
+     */
+    fun createNewAnimeSearchRequest(url: String, size: String, mute: Boolean,
+                                    cutBlackBorders: Boolean, showHContent: Boolean) {
         viewModelScope.launch {
-                val newItem = SearchItem(url, null)
+                val newItem = SearchItem(url, null, size, mute, cutBlackBorders, showHContent)
                 val newId = insert(newItem)
                 newItem.id = newId
                 searchByUrl(url, newItem)
         }
     }
+    /**
+     * create new [SearchItem] and start new call to trace.moe API
+     * [See API](https://soruly.github.io/trace.moe-api/#/docs?id=search-by-image-upload)
+     *
+     * @param imageUri uri to the image in public storage
+     * @param size for future use in [getVideoPreview]
+     * @param mute for future use in [getVideoPreview]
+     * @param cutBlackBorders for future use in [getVideoPreview]
+     * @param showHContent for future use in [updateSearchItemWithNewData]
+     */
+    fun createNewAnimeSearchRequest(imageUri: Uri, size: String, mute: Boolean,
+                                    cutBlackBorders: Boolean, showHContent: Boolean) {
+        viewModelScope.launch {
+            Log.i(TAG, "createNewAnimeSearchRequest: calls size = ${calls.size}")
+            //temporarily save image to cache dir, in case we need to repeat search request
+            val imageCopyName = LocalFilesRepository.copyImageToCacheDir(imageUri, getApplication())
+            if (imageCopyName != null) {
+                val newItem = SearchItem(null, imageCopyName, size, mute, cutBlackBorders, showHContent)
+                val newId = insert(newItem)
+                newItem.id = newId
+                //<--- stop 1
+                searchByImage(imageCopyName, newItem)
+            } else {
+                errorMessages.value = gallerySaveError
+            }
+        }
+    }
+
+    /**
+     * enqueue new search call and update SearchItem with new data once it is finished
+     * @param url url to the image hosted somewhere in public domain
+     * @param searchItemToUpdate [SearchItem] that will be updated once call is successful
+     */
     private suspend fun searchByUrl(url: String, searchItemToUpdate: SearchItem) {
         semaphoreForCheckingCalls.acquire()
+        // call is currently enqueued, so it does not need to be repeated
         if (calls.map { it.second }.contains(searchItemToUpdate.id)
             || finishedSearchCalls.contains(searchItemToUpdate.id)) {
             semaphoreForCheckingCalls.release()
             return
         }
 
-        val call = searchService.searchByUrl(url)
+        val cutBorders = if (searchItemToUpdate.cutBlackBorders) "" else null
+        val call = searchService.searchByUrl(url, cutBorders)
         calls.add(Pair(call, searchItemToUpdate.id))
         semaphoreConcurrencyLimit.acquire()
         call.enqueue(object : Callback<SearchByImageRequestResult> {
@@ -94,6 +179,7 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
                 } else {
                     delete(searchItemToUpdate)
                     Log.i(TAG, "searchByImage.onResponse: response. unsuccessful")
+                    errorMessages.value = unsuccessfulApi
                 }
                 finishedSearchCalls.add(searchItemToUpdate.id)
                 calls.remove(Pair(call, searchItemToUpdate.id))
@@ -105,7 +191,7 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
                 if (call.isCanceled){
                     delete(searchItemToUpdate)
                 } else {
-                    Log.i(TAG, "searchByImage.onFailure: response.isUnsuccessful")
+                    errorMessages.value = t.localizedMessage
                 }
                 calls.remove(Pair(call, searchItemToUpdate.id))
                 semaphoreConcurrencyLimit.release()
@@ -114,26 +200,9 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
         semaphoreForCheckingCalls.release()
     }
 
-    fun createNewAnimeSearchRequest(imageUri: Uri) {
-        viewModelScope.launch {
-            Log.i(TAG, "createNewAnimeSearchRequest: calls size = ${calls.size}")
-            val imageCopyName = LocalFilesRepository.copyImageToCacheDir(imageUri, getApplication())
-            if (imageCopyName != null) {
-                val newItem = SearchItem(null, imageCopyName)
-                val newId = insert(newItem)
-                newItem.id = newId
-                //<--- stop 1
-                searchByImage(imageCopyName, newItem)
-            } else {
-                //https://stackoverflow.com/questions/53484781/android-mvvm-is-it-possible-to-display-a-message-toast-snackbar-etc-from-the
-                //show one time error message
-            }
-        }
-    }
-
-    private suspend fun searchByImage(copyOfImageUri: String,
-                                      searchItemToUpdate: SearchItem) {
+    private suspend fun searchByImage(copyOfImageUri: String, searchItemToUpdate: SearchItem) {
         semaphoreForCheckingCalls.acquire()
+        // call is currently enqueued, so it does not need to be repeated
         if (calls.map { it.second }.contains(searchItemToUpdate.id)
             || finishedSearchCalls.contains(searchItemToUpdate.id)) {
             semaphoreForCheckingCalls.release()
@@ -142,14 +211,18 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
 
         val fullImageUri = LocalFilesRepository.getFullImagePath(copyOfImageUri, getApplication())
 
+        // image was deleted from cache dir
         if (!File(fullImageUri).exists()) {
             delete(searchItemToUpdate)
             semaphoreForCheckingCalls.release()
             return
         }
 
+        // prepare file to be send
         val body = prepareMultipart(fullImageUri)
-        val call = searchService.searchByImage(body)
+
+        val cutBorders = if (searchItemToUpdate.cutBlackBorders) "" else null
+        val call = searchService.searchByImage(body, cutBorders)
         calls.add(Pair(call, searchItemToUpdate.id))
 
         semaphoreConcurrencyLimit.acquire()
@@ -163,7 +236,8 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
                     updateSearchItemWithNewData(responseBody, searchItemToUpdate)
                     Log.i(TAG, "searchByImage.onResponse: response. successful")
                 } else {
-                    Log.i(TAG, "searchByImage.onResponse: response.isUnsuccessful")
+                    errorMessages.value = unsuccessfulApi
+                    Log.i(TAG, "searchByImage.onResponse: response.isUnsuccessful ")
                 }
                 finishedSearchCalls.add(searchItemToUpdate.id)
                 calls.remove(Pair(call, searchItemToUpdate.id))
@@ -176,6 +250,7 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
                     Log.i(TAG, "searchByImage.onFailure: response.canceled")
                 } else {
                     Log.i(TAG, "searchByImage.onFailure: response.isUnsuccessful")
+                    errorMessages.value = t.localizedMessage
                 }
                 calls.remove(Pair(call, searchItemToUpdate.id))
                 semaphoreConcurrencyLimit.release()
@@ -193,10 +268,13 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
     private fun updateSearchItemWithNewData(searchByImageRequestResult: SearchByImageRequestResult,
                                             searchItemToUpdate: SearchItem) {
         viewModelScope.launch {
-            if (searchByImageRequestResult.error != "" || searchByImageRequestResult.result.isEmpty() )
+            if (searchByImageRequestResult.error != "" || searchByImageRequestResult.result.isEmpty() ) {
                 repository.delete(searchItemToUpdate, getApplication())
+                errorMessages.value = searchByImageRequestResult.error ?: unsuccessfullResults
+                return@launch
+            }
 
-            val listToInsert = searchByImageRequestResult.result.map {
+            val fullListToInsert = searchByImageRequestResult.result.map {
                 SearchResult(
                     id = 0,
                     parentId = searchItemToUpdate.id,
@@ -213,21 +291,33 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
                     imageURL = it.image
                 )
             }
+            // filter list if showHContent preference was not ticked in root_preferences
+            val filteredList = if (!searchItemToUpdate.showHContent) {
+                fullListToInsert.filter { it.isAdult == false }
+            } else fullListToInsert
+
+            if (filteredList.isEmpty()) {
+                repository.delete(searchItemToUpdate, getApplication())
+                errorMessages.value = hornyError
+            }
 
             Log.i(TAG, "updateSearchItemWithNewData: deleteImage ${searchItemToUpdate.imageFileName} ")
             LocalFilesRepository.deleteImage(searchItemToUpdate.imageFileName, getApplication())
             semaphoreVideoCall.acquire()
             val newInstance = searchItemToUpdate.apply {
-                selectedResultId = repository.insertAllAndReturnIdOfFirst(listToInsert)
+                selectedResultId = repository.insertAllAndReturnIdOfFirst(filteredList)
                 imageFileName = null
                 url = null
             }
 
             repository.update(newInstance)
-            getVideoPreview(listToInsert[0].videoURL, newInstance)
+            getVideoPreview(filteredList[0].videoURL, newInstance)
         }
     }
 
+    /**
+     * repeat search request if it was unsuccessful (no videoFileName in [SearchItem])
+     */
     fun repeatAnimeSearchRequest(item: SearchItemWithSelectedResult) {
         viewModelScope.launch {
             item.searchResult?.videoURL?.let {
@@ -256,6 +346,9 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
         }
     }
 
+    /**
+     * update [SearchItem] with new video
+     */
     fun replaceWithNewVideo(searchItemId: Long, newSearchResult: SearchResult){
         viewModelScope.launch {
             semaphoreVideoCall.acquire()
@@ -272,11 +365,16 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
         }
     }
 
+    /**
+     * download video preview from server and save it to external dir
+     * [See Api](https://soruly.github.io/trace.moe-api/#/docs?id=media-preview)
+     */
     private suspend fun getVideoPreview(url: String, searchItemToUpdate: SearchItem){
         val fileName = "${System.currentTimeMillis()}.mp4"
         Log.i(TAG, "getVideoPreview: $fileName, ${calls.map { it.second }}")
 
-        val call = searchService.getVideoPreview(url)
+        val mute = if (searchItemToUpdate.mute) "" else null
+        val call = searchService.getVideoPreview(url, searchItemToUpdate.size, mute)
         val callWithId = Pair(call, searchItemToUpdate.id)
         calls.add(callWithId)
 
@@ -291,16 +389,17 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
                     if (responseBody != null) {
                         val savedfileName = LocalFilesRepository
                             .saveVideoToExternalStorage(responseBody, fileName, getApplication())
-
                         if (savedfileName != null) {
                             updateSearchItemWithVideo(searchItemToUpdate, savedfileName)
                         } else {
                             Log.i(TAG, "getVideoPreview: canceled during saving video $fileName")
                             LocalFilesRepository.deleteVideo(fileName, getApplication())
+                            errorMessages.value = videoSaveError
                         }
 
                     } else {
                         Log.i(TAG, "getVideoPreview: response.isUnsuccessful $fileName")
+                        errorMessages.value = unsuccessfulApi
                     }
 
                     calls.remove(callWithId)
@@ -313,6 +412,7 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
                     Log.i(TAG, "getVideoPreview: response.canceled $fileName")
                 } else {
                     Log.i(TAG, "getVideoPreview: response.isUnsuccessful $fileName")
+                    errorMessages.value = t.localizedMessage
                 }
                 calls.remove(callWithId)
             }
@@ -329,6 +429,9 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
 
     }
 
+    /**
+     * cancel call by [SearchItem] id
+     */
     private fun cancelCall(id: Long): Boolean {
         for (pair in calls){
             if (pair.second == id) {
@@ -341,6 +444,9 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
         return false
     }
 
+    /**
+     * temporarly save video to public storage and return its Uri from MediaStore
+     */
     fun share(fileName: String, context: Context) {
         Log.i(TAG, "share: $fileName")
         val originalFile = File(LocalFilesRepository.getFullVideoPath(fileName, context))
@@ -349,10 +455,10 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
                 originalFile,
                 context
             )
-            Log.i(TAG, "share: $uri", )
-            _uriToShare.postValue(uri)
+            Log.i(TAG, "share: $uri")
+            _uriToShare.postValue(Event(uri))
         } catch (securityException: SecurityException) {
-            Log.i(TAG, "share: securityException", )
+            Log.i(TAG, "share: securityException")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val recoverableSecurityException =
                     securityException as? RecoverableSecurityException
@@ -360,7 +466,7 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
 
                 // Signal to the Activity that it needs to request permission and
                 // try the share again if it succeeds.
-                pendingImage = fileName
+                pendingVideo = fileName
                 _permissionNeededForUpdate.postValue(
                     recoverableSecurityException.userAction.actionIntent.intentSender
                 )
@@ -370,9 +476,9 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
         }
     }
 
-    fun deletePendingImage(context: Context) {
-        pendingImage?.let { image ->
-            pendingImage = null
+    fun sharePendingImage(context: Context) {
+        pendingVideo?.let { image ->
+            pendingVideo = null
             share(image, context)
         }
     }

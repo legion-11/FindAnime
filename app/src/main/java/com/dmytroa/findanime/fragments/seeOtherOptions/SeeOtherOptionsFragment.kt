@@ -21,7 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
- * A simple [Fragment] subclass as the second destination in the navigation.
+ * Fragment for replacing video preview
  */
 class SeeOtherOptionsFragment : Fragment(), OtherOptionsAdapter.OnItemClickListener {
 
@@ -87,7 +87,12 @@ class SeeOtherOptionsFragment : Fragment(), OtherOptionsAdapter.OnItemClickListe
             )
             binding.recyclerView.layoutManager = LinearLayoutManager(context)
             binding.recyclerView.adapter = adapter
+            binding.swipeContainer.setOnRefreshListener {
+                adapter.notifyDataSetChanged()
+                binding.swipeContainer.isRefreshing = false
+            }
         })
+
     }
 
     override fun onDestroyView() {
@@ -102,8 +107,10 @@ class SeeOtherOptionsFragment : Fragment(), OtherOptionsAdapter.OnItemClickListe
 
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
         menu.clear()
-        (requireActivity() as SharedInterfaces.OnCreateToolbar)
-            .prepareToolbar(androidx.appcompat.R.drawable.abc_ic_ab_back_material, false)
+        fragmentListener.prepareToolbar(
+            androidx.appcompat.R.drawable.abc_ic_ab_back_material,
+            false
+        )
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {

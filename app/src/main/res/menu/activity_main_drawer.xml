@@ -7,15 +7,15 @@
     <item
         android:id="@+id/about_menu_item"
         android:icon="@drawable/ic_baseline_help_24"
-        android:title="About" />
+        android:title="@string/about" />
 
     <item
         android:id="@+id/settings_menu_item"
-        android:title="trace.moe Settings"
+        android:title="@string/settings"
         android:icon="@drawable/ic_baseline_settings_24" />
 
     <item
         android:id="@+id/quota_menu_item"
-        android:title="check trace.moe Quota"
+        android:title="@string/check_trace_moe_quota"
         android:icon="@drawable/ic_baseline_cancel_schedule_send_24" />
 </menu>

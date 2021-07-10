@@ -5,6 +5,11 @@ import androidx.room.Relation
 import java.util.*
 import kotlin.math.min
 
+/**
+ * Defines one-to-one relationships between
+ * [com.dmytroa.findanime.dataClasses.roomDBEntity.SearchItem] and
+ * [com.dmytroa.findanime.dataClasses.roomDBEntity.SearchResult]
+ */
 data class SearchItemWithSelectedResult(
     @Embedded val searchItem: SearchItem,
     @Relation(
@@ -39,6 +44,10 @@ data class SearchItemWithSelectedResult(
         return searchResult?.getName() ?: ""
     }
 
+    /**
+     * @param str string to compare
+     * @return how many first letters are the same as  [str]
+     */
     fun getTextComparisonScore(str: String): Int {
         val name = getName().lowercase(Locale.ROOT)
         val comparableString = str.lowercase(Locale.ROOT)

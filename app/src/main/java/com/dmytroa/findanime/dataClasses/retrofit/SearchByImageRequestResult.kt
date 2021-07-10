@@ -1,5 +1,10 @@
 package com.dmytroa.findanime.dataClasses.retrofit
 
+/**
+ * body of the response for search requests to https://api.trace.moe/search
+ *
+ * [See API](https://soruly.github.io/trace.moe-api/#/docs?id=response-format)
+ */
 data class SearchByImageRequestResult(
     val error: String?,
     val frameCount: Int?,

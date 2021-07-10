@@ -6,6 +6,7 @@ import android.content.ClipDescription.MIMETYPE_TEXT_PLAIN
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.DialogInterface
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
@@ -14,9 +15,11 @@ import android.text.TextWatcher
 import android.util.Log
 import android.util.Patterns
 import android.view.MenuItem
+import android.view.MotionEvent
 import android.view.View
 import android.view.animation.Animation
 import android.view.animation.AnimationUtils
+import android.view.inputmethod.InputMethodManager
 import android.webkit.URLUtil
 import android.widget.ImageButton
 import androidx.activity.viewModels
@@ -31,6 +34,7 @@ import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
 import androidx.navigation.findNavController
+import androidx.preference.PreferenceManager
 import com.dmytroa.findanime.dataClasses.retrofit.Quota
 import com.dmytroa.findanime.fragments.SharedInterfaces
 import com.dmytroa.findanime.fragments.imageDrawer.ImageDrawerListDialogFragment
@@ -54,8 +58,7 @@ import java.net.URL
 
 class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageClickListener,
     SharedInterfaces.FragmentListener,
-    NavigationView.OnNavigationItemSelectedListener,
-    SharedInterfaces.OnCreateToolbar {
+    NavigationView.OnNavigationItemSelectedListener {
 
     private val searchService = RetrofitInstance.getInstance().create(SearchService::class.java)
     private val FragmentManager.currentNavigationFragment: Fragment?
@@ -73,20 +76,23 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
     private lateinit var drawerLayout: DrawerLayout
     private lateinit var clipboard: ClipboardManager
 
+    private lateinit var defaultSharedPreferences: SharedPreferences
+
     private val sharedViewModel: SharedViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        defaultSharedPreferences = PreferenceManager.getDefaultSharedPreferences(this)
+
         fabMain = findViewById(R.id.floatingActionButton)
-        fabMain.setOnSafeClickListener { requestPermission() }
         fabImages = findViewById(R.id.floatingActionButtonFromImage)
         fabUrl = findViewById(R.id.floatingActionButtonFromUrl)
 
-        fabImages.setOnClickListener { requestPermission() }
+        fabImages.setOnSafeClickListener { requestPermission() }
 
-        fabUrl.setOnClickListener { buildUrlInputDialog() }
+        fabUrl.setOnSafeClickListener { buildUrlInputDialog() }
 
         animationFwd = AnimationUtils.loadAnimation(this, R.anim.fab_rotate_fwd)
         animationBwd = AnimationUtils.loadAnimation(this, R.anim.fab_rotate_bwd)
@@ -112,8 +118,12 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
                 return true
             }
         })
+        if (defaultSharedPreferences.getBoolean("show_files_in_gallery", false)) {
+            LocalFilesRepository.deleteNoMediaFile(this)
+        } else {
+            LocalFilesRepository.createNoMediaFile(this)
+        }
 
-        LocalFilesRepository.createNoMediaFile(this)
         clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     }
 
@@ -165,7 +175,7 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
         val dialog = AlertDialog.Builder(this)
             .setTitle("Search with Url")
             .setView(layout)
-            .setPositiveButton("Search") { dialog: DialogInterface, i: Int ->
+            .setPositiveButton("Search") { dialog: DialogInterface, _: Int ->
                 submitRequest(textInput.text.toString())
                 dialog.dismiss()
             }
@@ -207,7 +217,7 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
             if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 showImageDrawerListDialogFragment()
             } else {
-                Snackbar.make(fabMain, "You can always enable gallery in settings", Snackbar.LENGTH_LONG)
+                Snackbar.make(fabMain, "Permission denied", Snackbar.LENGTH_LONG)
                     .setAction("Action", null).show()
             }
         }
@@ -226,15 +236,17 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
     private fun submitRequest(imageUri: Uri) {
         supportFragmentManager.currentNavigationFragment?.let {fragment ->
             if (fragment is Interfaces.SubmitSearchRequest) {
-                (fragment as Interfaces.SubmitSearchRequest).imageRequest(imageUri)
+                (fragment as Interfaces.SubmitSearchRequest)
+                    .createRequest(Interfaces.SearchOption.MyUri(imageUri))
             }
         }
     }
 
-    fun submitRequest(url: String) {
+    private fun submitRequest(url: String) {
         supportFragmentManager.currentNavigationFragment?.let {fragment ->
             if (fragment is Interfaces.SubmitSearchRequest) {
-                (fragment as Interfaces.SubmitSearchRequest).urlRequest(url)
+                (fragment as Interfaces.SubmitSearchRequest)
+                    .createRequest(Interfaces.SearchOption.MyUrl(url))
             }
         }
     }
@@ -251,6 +263,7 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
         set(value) {sharedViewModel.extraFabsIsExpanded = value}
 
     override fun restoreDefaultState() {
+        fabMain.show()
         if (extraFabsIsExpanded) {
             fabMain.startAnimation(animationBwd)
             fabImages.hide()
@@ -259,6 +272,7 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
     }
 
     override fun restoreExpandableState() {
+        fabMain.show()
         if (extraFabsIsExpanded) {
             fabMain.startAnimation(animationFwd)
             fabImages.show()
@@ -303,13 +317,13 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
         }
     }
 
-    override fun showSnackBar() {
-        //TODO("Not yet implemented")
+    override fun showSnackBar(message: String) {
+        Snackbar.make(fabMain, message, Snackbar.LENGTH_LONG).show()
     }
 
     override fun setupFab(fabIconRes: Int, function: () -> Unit) {
         fabMain.setImageResource(fabIconRes)
-        fabMain.setOnSafeClickListener { function() }
+        fabMain.setOnClickListener { function() }
     }
 
     companion object {
@@ -324,6 +338,7 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
                 true
             }
             R.id.about_menu_item -> {
+                findNavController(R.id.nav_host_fragment).navigate(R.id.AboutFragment)
                 drawerLayout.closeDrawer(GravityCompat.START)
                 true
             }
@@ -342,7 +357,7 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
                     }
 
                     override fun onFailure(call: Call<Quota>, t: Throwable) {
-                        Snackbar.make(fabMain, "Something went wrong", Snackbar.LENGTH_LONG).show()
+                        Snackbar.make(fabMain, t.message ?: getString(R.string.error_unspecified_error), Snackbar.LENGTH_LONG).show()
                     }
                 })
                 drawerLayout.closeDrawer(GravityCompat.START)
@@ -359,5 +374,14 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
 
     override fun openDrawer() {
         drawerLayout.openDrawer(GravityCompat.START)
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
+        if (currentFocus != null) {
+            val imm: InputMethodManager =
+                getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            imm.hideSoftInputFromWindow(currentFocus!!.windowToken, 0)
+        }
+        return super.dispatchTouchEvent(ev)
     }
 }

@@ -1,24 +1,71 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <PreferenceCategory app:title="trace.moe preferences">
+    <PreferenceCategory app:title="Settings">
 <!--        <EditTextPreference-->
 <!--            app:defaultValue=""-->
 <!--            app:key="api_key"-->
 <!--            app:title="Use trace.moe API Key"-->
 <!--            app:useSimpleSummaryProvider="true" />-->
 
+        <SwitchPreferenceCompat
+            app:defaultValue="true"
+            app:key="show_files_in_gallery"
+            app:title="Show downloaded videos in gallery" />
+
+        <SwitchPreferenceCompat
+            app:defaultValue="true"
+            app:key="do_not_ask_before_search"
+            app:title="Don't show dialog before the search" />
+
+    </PreferenceCategory>
+
+
+    <PreferenceCategory
+        app:title="Default trace.moe settings"
+        app:dependency="do_not_ask_before_search">
         <ListPreference
-            app:defaultValue="m"
-            app:entries="@array/video_length_entries"
-            app:entryValues="@array/video_length_values"
-            app:key="video_length"
-            app:title="Video preview length"
+            app:key="video_size"
+            app:defaultValue="l"
+            app:entries="@array/video_size_entries"
+            app:entryValues="@array/video_size_values"
+            app:title="Video preview size"
             app:useSimpleSummaryProvider="true" />
 
         <SwitchPreferenceCompat
-            app:key="h_content"
-            app:title="Show H content" />
+            app:key="cut_black_borders"
+            app:defaultValue="true"
+            app:title="Cut black borders "
+            app:summary="(may affect accuracy)"/>
+
+        <SwitchPreferenceCompat
+            app:key="mute_video"
+            app:title="Mute video preview" />
+
+        <SwitchPreferenceCompat
+            app:key="show_h_content"
+            app:title="Show H content"
+            app:summary="By enabling this option you are confirming that you are legal age" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="Authors">
+
+        <Preference
+            app:key="my_github"
+            app:title="legion-11"
+            app:summary="Android App Developer" />
+
+        <Preference
+            app:key="soruly_github"
+            app:title="soruly"
+            app:summary="Trace.moe API creator" />
+
+        <Preference
+            app:key="app_logo_attribution"
+            app:title=" pikisuperstar"
+            app:summary="App logo character vector creator - www.freepik.com" />
+
     </PreferenceCategory>
 
 </PreferenceScreen>

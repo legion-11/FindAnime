@@ -14,12 +14,10 @@ class RetrofitInstance {
 
         fun getInstance(): Retrofit {
 
-            val logging = HttpLoggingInterceptor().apply { setLevel(HttpLoggingInterceptor.Level.BODY) }
-
             val client = OkHttpClient.Builder()
                 .connectTimeout(60, TimeUnit.SECONDS)
-//                .addInterceptor(logging)
-                .readTimeout(60,TimeUnit.SECONDS).build()
+                .readTimeout(60,TimeUnit.SECONDS)
+                .build()
 
             return retrofit ?: Retrofit.Builder().baseUrl("https://api.trace.moe/")
                 .client(client)

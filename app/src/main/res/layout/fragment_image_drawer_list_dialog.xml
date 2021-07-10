@@ -21,10 +21,10 @@
             android:minHeight="@dimen/resizable_view_min_height">
 
             <View
-                android:layout_width="30dp"
+                android:layout_width="@dimen/resizable_view_handle_width"
                 android:layout_height="@dimen/resizable_view_handle_height"
                 android:layout_gravity="center_horizontal|top"
-                android:layout_margin="4dp"
+                android:layout_margin="@dimen/half_small_margin"
                 android:background="@color/gray_400"
                 android:minHeight="@dimen/resizable_view_min_height" />
         </FrameLayout>
@@ -43,7 +43,7 @@
                 android:id="@+id/toolbarSpinner"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginHorizontal="16dp"
+                android:layout_marginHorizontal="@dimen/medium_margin"
                 android:backgroundTint="@color/theme_color_inverse"
                 android:dropDownWidth="match_parent" />
         </androidx.appcompat.widget.Toolbar>

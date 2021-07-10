@@ -22,9 +22,16 @@ import com.dmytroa.findanime.dataClasses.roomDBEntity.SearchItem
 import com.dmytroa.findanime.dataClasses.roomDBEntity.SearchItemWithSelectedResult
 import com.dmytroa.findanime.databinding.SearchItemsBinding
 import com.dmytroa.findanime.repositories.LocalFilesRepository
+import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.*
 import java.io.File
 
+/**
+ * adapter for recycler view in [SearchFragment]
+ * @param allItems all [SearchItem]s from room db
+ * @param maxHeight maximum height of items (calculates from toolbar, appbar, and statusbar heights)
+ * @param listener listener to adapter item clicks
+ */
 class SearchItemAdapter(
     private var allItems: Array<SearchItemWithSelectedResult>,
     private val maxHeight: Int,
@@ -42,7 +49,9 @@ class SearchItemAdapter(
             field = value
             filter.filter(textFilter)
         }
+    // items that will be presented to user
     private var filteredItems: Array<SearchItemWithSelectedResult> = getFilteredArray(textFilter)
+
     var selectedItemId: Long? = null
     set(value) {
         if (field == value) return
@@ -57,10 +66,21 @@ class SearchItemAdapter(
         lastSelectedViewHolder?.changeStrokeColor()
     }
 
+    // strings from resource for formating time and episode
+    private lateinit var similarityString: String
+    private lateinit var timeString: String
+    private lateinit var episodeString: String
+    private lateinit var episodeAndTimeString: String
+    private lateinit var videoThumbnailError: String
 
     override fun onAttachedToRecyclerView(recyclerView: RecyclerView) {
         super.onAttachedToRecyclerView(recyclerView)
         this.recyclerView = recyclerView
+        similarityString = recyclerView.resources.getString(R.string.similarity)
+        timeString = recyclerView.resources.getString(R.string.time_part)
+        episodeString = recyclerView.resources.getString(R.string.episode_part)
+        episodeAndTimeString = recyclerView.resources.getString(R.string.episode_and_time)
+        videoThumbnailError = recyclerView.resources.getString(R.string.error_loading_thumbnail)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): BaseViewHolder {
@@ -75,6 +95,7 @@ class SearchItemAdapter(
         (holder as ViewHolder).bind(item)
     }
 
+    // stopPlayback of videoView to prevent lag
     override fun onViewDetachedFromWindow(holder: BaseViewHolder) {
         Log.i("SearchItemAdapter", "onViewDetachedFromWindow: ")
         holder as ViewHolder
@@ -90,7 +111,12 @@ class SearchItemAdapter(
 
     override fun getItemCount(): Int = filteredItems.size
 
+    // scroll to top if user adds new item
     private var needScroll = false
+
+    /**
+     * update fullDataset from room db
+     */
     fun setFullDataset(newDataset : Array<SearchItemWithSelectedResult>) {
         val oldItems = allItems
         needScroll = allItems.size == filteredItems.size && oldItems.size < newDataset.size
@@ -106,23 +132,32 @@ class SearchItemAdapter(
         if (textFilter.isNotEmpty() || needScroll) {
             needScroll = false
             recyclerView.scrollToPosition(0)
-            // if you do not notify it takes focus from search view
+            // (strange bug) if you do not notify it takes focus from search view once you start scrolling
             if (textFilter.isNotEmpty()) { notifyDataSetChanged()}
         }
     }
 
+    /**
+     * set maximum height of video view to be smaller than screen - different bars
+     */
     private fun setMaxHeightToVisibleHeightOfDeviceScreen(itemView: SearchItemsBinding) {
         val params = itemView.videoContainer.layoutParams as ConstraintLayout.LayoutParams
         params.matchConstraintMaxHeight = maxHeight
         itemView.videoContainer.layoutParams = params
     }
-
+    /**
+     * remove item from dataset
+     */
     fun deleteItem(id: Long) {
-        val newItems = filteredItems.toCollection(mutableListOf())
+        val newItems = allItems.toCollection(mutableListOf())
         newItems.removeAt(newItems.indexOfFirst { it.searchItem.id == id })
         setFullDataset(newItems.toTypedArray())
     }
 
+    /**
+     * @param charSearch text from searchview once it updated
+     * @return filtered by filters (textfilter from searchview) and bookmarks filter fulldataset
+     */
     private fun getFilteredArray(charSearch: String): Array<SearchItemWithSelectedResult> {
         val firstFilter = if (charSearch.isEmpty()) {
             allItems
@@ -142,10 +177,12 @@ class SearchItemAdapter(
         }
     }
 
+
     private fun compareReversed(str: String) = Comparator<SearchItemWithSelectedResult> { o1, o2 ->
         o2.getTextComparisonScore(str) - o1.getTextComparisonScore(str)
     }
 
+    // filter dataset by searchview text
     override fun getFilter(): Filter {
         return  object : Filter() {
 
@@ -168,29 +205,61 @@ class SearchItemAdapter(
         return filteredItems[pos]
     }
 
+    /**
+     * @return formated time "HH:MM:SS" or ""
+     */
+    private fun getTimeString(sec: Double?): String {
+        val from = sec?.toInt()
+        return if (from == null){
+            ""
+        } else {
+            val hours = from / 3600
+            val minutes = (from % 3600) / 60
+            val seconds = from % 60
+            timeString.format(hours, minutes, seconds)
+        }
+    }
+    /**
+     * @return formated episode without trailing zeros
+     */
+    private fun getEpisodeString(str: String?): String {
+        if (str == null) return ""
+        val asInt = str.toFloatOrNull()?.toInt()
+        // without trailingZeros
+        if (asInt != null) {
+            val withoutTrailingZeros = "%d".format(asInt)
+            return episodeString.format(withoutTrailingZeros)
+        }
+        return episodeString.format(str)
+    }
+
     //just in case I will do some other viewHolders
     abstract class BaseViewHolder(itemBinding: ViewBinding):
         RecyclerView.ViewHolder(itemBinding.root)
 
+    /**
+     * viewHolder for [SearchItemAdapter]
+     */
     private inner class ViewHolder(itemBinding: SearchItemsBinding):
         BaseViewHolder(itemBinding), View.OnClickListener, View.OnLongClickListener {
 
         val fileNameTV: TextView = itemBinding.nameTextView
         val similarityTV: TextView = itemBinding.similarityTextView
+        val episodeAndTimeTV: TextView = itemBinding.episodeAndTimeTextView
         val videoView: VideoView = itemBinding.videoView
+        // since it is very laggy to show video preview by showing first second
+        // we can just save it in image view and not load video at all
         val thumbnailImageView: ImageView = itemBinding.thumbnailImageView
         val videoContainer = itemBinding.videoContainer
-        val buttonsContainer = itemBinding.buttonsContainer
-        val textContainer = itemBinding.textContainer
+        val buttonsPlaceholder = itemBinding.buttonsSkeletonContainer
+        val textPlaceholder = itemBinding.textSkeletonContainer
+        val videoPlaceholder = itemBinding.videoSkeletonContainer
         val toggleBookmarks = itemBinding.toggleBookmarks
         val malButton = itemBinding.MALImageButton
         val root = itemBinding.root
 
         init {
-            textContainer.layout = R.layout.default_text_layout
-            buttonsContainer.layout = R.layout.default_buttons_layout
-
-            //resize to save aspect ratio
+            //resize to save aspect ratio once user started playing video
             videoView.setOnPreparedListener { mp ->
                 resizeVideo(mp)
                 mp.start()
@@ -198,6 +267,9 @@ class SearchItemAdapter(
             }
         }
 
+        /**
+         * resize videoView depending on video aspect ratio
+         */
         private fun resizeVideo(mp: MediaPlayer){
             val videoWidth = mp.videoWidth
             val videoHeight = mp.videoHeight
@@ -224,6 +296,11 @@ class SearchItemAdapter(
             videoView.layoutParams = layoutParams
         }
 
+        /**
+         * videoView.setOnPreparedListener not representing the moment once video is fully ready to play
+         * so to prevent flickering of black color while video is starting we just hiding thumbnail
+         * once current playback position changes from 0
+         */
         private fun showVideoViewOnceVideoIsFullyPrepared(mp: MediaPlayer?) {
             CoroutineScope(Dispatchers.IO).launch {
                 var started = false
@@ -248,16 +325,38 @@ class SearchItemAdapter(
             }
         }
 
+        // hide placeholders for buttons and video
         private fun unVeilVideo() {
-            videoContainer.unVeil()
-            buttonsContainer.apply { unVeil(); visibility = View.GONE }
+            videoPlaceholder.apply {
+                stopShimmer()
+                visibility = View.GONE
+            }
+            buttonsPlaceholder.apply {
+                stopShimmer()
+                visibility = View.GONE
+            }
+            malButton.visibility = View.VISIBLE
+            toggleBookmarks.visibility = View.VISIBLE
         }
 
+        // show placeholders for buttons and video
         private fun veilVideo() {
-            videoContainer.veil()
-            buttonsContainer.apply { veil(); visibility = View.VISIBLE }
+            videoPlaceholder.apply {
+                startShimmer()
+                visibility = View.VISIBLE
+            }
+            buttonsPlaceholder.apply {
+                startShimmer()
+                visibility = View.VISIBLE
+            }
+            malButton.visibility = View.INVISIBLE
+            toggleBookmarks.visibility = View.INVISIBLE
         }
 
+        /**
+         * instead of loading cideo we just loading thumbnail,
+         * and loading video only when user clicks on it
+         */
         private fun loadVideo(item: SearchItem) {
             val videoURI = item.videoFileName?.let { LocalFilesRepository.getFullVideoPath(it, recyclerView.context) }
 
@@ -284,7 +383,7 @@ class SearchItemAdapter(
                         isFirstResource: Boolean
                     ): Boolean {
                         unVeilVideo()
-                        Log.i("SearchItemAdapter", "loadVideo: onLoadFailed")
+                        Snackbar.make(recyclerView, videoThumbnailError, Snackbar.LENGTH_LONG).show()
                         return false
                     }
 
@@ -321,6 +420,9 @@ class SearchItemAdapter(
             root.isSelected = isSelected()
         }
 
+        /**
+         * bind viewHolder to recyclerview
+         */
         fun bind(item: SearchItemWithSelectedResult) {
             Log.i("ViewHolder", "onBindViewHolder: $item")
 
@@ -330,14 +432,29 @@ class SearchItemAdapter(
             }
 
             fileNameTV.text = item.getName()
-            similarityTV.text = itemData?.similarity
+            similarityTV.text = if (itemData?.similarity != null)
+                similarityString.format(itemData.similarity)
+            else
+                ""
+
+            val timeFormatted = getTimeString(itemData?.from)
+            val episodeFormated = getEpisodeString(itemData?.episode)
+
+            episodeAndTimeTV.text = episodeAndTimeString.format(episodeFormated, timeFormatted)
+
             toggleBookmarks.isChecked = item.searchItem.isBookmarked
             toggleBookmarks.setOnCheckedChangeListener { _, isChecked ->
                 listener.setIsBookmarked(isChecked, item.searchItem)
             }
             malButton.setOnClickListener(this@ViewHolder)
-            if (fileNameTV.text.isNotBlank()) { textContainer.unVeil(); textContainer.visibility = View.GONE }
-            else { textContainer.veil(); textContainer.visibility = View.VISIBLE  }
+            if (fileNameTV.text.isNotBlank()) {
+                textPlaceholder.stopShimmer()
+                textPlaceholder.visibility = View.GONE
+            }
+            else {
+                textPlaceholder.startShimmer()
+                textPlaceholder.visibility = View.VISIBLE
+            }
 
             changeStrokeColor()
             Log.i("SearchItemAdapter", "bind: call load video")
@@ -346,6 +463,7 @@ class SearchItemAdapter(
         }
 
         override fun onClick(v: View?) {
+            // not sure how it is possible but I once had error with it (only once, but it was strange)
             if (bindingAdapterPosition<0) return
             val item = filteredItems[bindingAdapterPosition]
             when(v) {
@@ -415,6 +533,9 @@ class SearchItemAdapter(
         }
     }
 
+    /**
+     * interface for sending data to [SearchFragment] on clicks on viewHolder
+     */
     interface OnSearchAdapterItemClickListener {
         fun openMal(idMal: Int)
         fun setIsBookmarked(isChecked: Boolean, searchItem: SearchItem)

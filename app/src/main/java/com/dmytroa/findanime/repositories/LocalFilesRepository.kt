@@ -5,8 +5,8 @@ import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
 import android.os.Build
-import android.os.Bundle
 import android.os.Environment
+import android.os.FileUtils
 import android.os.ParcelFileDescriptor
 import android.provider.MediaStore
 import android.util.Log
@@ -23,13 +23,15 @@ import kotlinx.coroutines.launch
 import okhttp3.ResponseBody
 import java.io.*
 
-
+/**
+ * repository for saving data to room db
+ */
 class LocalFilesRepository(private val searchDao: SearchDao) {
 
     suspend fun insert(searchItem: SearchItem): Long = searchDao.insert(searchItem)
 
-    suspend fun insertAllAndReturnIdOfFirst(list: List<SearchResult>): Long
-    = searchDao.insertAllAndReturnIdOfFirst(list)
+    suspend fun insertAllAndReturnIdOfFirst(list: List<SearchResult>): Long =
+        searchDao.insertAllAndReturnIdOfFirst(list)
 
     fun delete(searchItem: SearchItem, context: Context) {
         CoroutineScope(Dispatchers.IO).launch{
@@ -43,7 +45,8 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
 
     suspend fun update(searchItem: SearchItem) = searchDao.update(searchItem)
 
-    suspend fun getSearchItemWithSelectedResult(id: Long): SearchItemWithSelectedResult? = searchDao.getSearchItemWithSelectedResult(id)
+    suspend fun getSearchItemWithSelectedResult(id: Long): SearchItemWithSelectedResult? =
+        searchDao.getSearchItemWithSelectedResult(id)
 
     fun setIsBookmarked(searchItem: SearchItem, b: Boolean) {
         CoroutineScope(Dispatchers.IO).launch{ searchDao.setIsBookmarked(searchItem.id, b) }
@@ -57,11 +60,12 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
     suspend fun getAllResultsByItemId(id: Long): Array<SearchResult> =
         searchDao.getAllResultsByItemId(id)
 
-
-
     companion object {
         private const val TAG = "LocalFilesRepository"
 
+        /**
+         * prevent application media files to be shown in gallery
+         */
         fun createNoMediaFile(context: Context) {
             val dstDir = File(getVideoDirPath(context))
             if (!dstDir.exists())
@@ -71,6 +75,9 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
                 fileToCreate.createNewFile()
         }
 
+        /**
+         * show application media files in gallery
+         */
         fun deleteNoMediaFile(context: Context) {
             val dstDir = File(getVideoDirPath(context))
             val fileToCreate = File(dstDir, ".nomedia")
@@ -138,6 +145,7 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
 
         /**
          * copy image to internal storage and send fileName
+         * @return filename of saved file or null if file was not created
          **/
         fun copyImageToCacheDir(imageUri: Uri, context: Context): String? {
             val dstName = System.currentTimeMillis().toString()
@@ -165,6 +173,10 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
             return null
         }
 
+        /**
+         * save video preview to external storage
+         * @return filename of saved file or null if file was not created
+         **/
         fun saveVideoToExternalStorage(body: ResponseBody, fileName: String, context: Context): String? {
             val dstDir = File(getVideoDirPath(context))
             if (!dstDir.exists())
@@ -176,19 +188,24 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
                 return try {
                     body.byteStream().use { input ->
                         fileToCreate.outputStream().use { output ->
-                            input.copyTo(output, 2 * 1024)
-                            Log.i(TAG, "saveVideo: finished ${fileToCreate.path}")
+                            val bytes = input.copyTo(output, 2 * 1024)
+                            Log.i(TAG, "saveVideo: finished ${fileToCreate.path} $bytes")
                         }
                     }
+                    body.close()
                     fileName
                 } catch (e: IOException) {
                     e.printStackTrace()
+                    Log.i(TAG, "saveVideo: crashed")
                     null
                 }
             }
             return null
         }
 
+        /**
+         * save video file to public storage
+         */
         fun createTemporaryCopyInPublicStorage(file: File, context: Context): Uri? {
             val fileName = "tmp"
             return if(Build.VERSION.SDK_INT >= 29) {
@@ -270,7 +287,10 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
             )
         }
 
-
+        /**
+         * querry contentResolver for file
+         * @return uri to founded file or null if there is no file in MediaStore
+         */
         private fun findCreatedTemporaryUri(context: Context, fileName: String, path: String): Uri? {
             val collection = if(Build.VERSION.SDK_INT >= 29) {
                 MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
@@ -315,6 +335,9 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
             }
         }
 
+        /**
+         * save file to publick storage for android 10 and higher
+         */
         @RequiresApi(Build.VERSION_CODES.Q)
         private fun copyVideoQAndAbove(context: Context,
                                        fileToCopy: File,
@@ -330,7 +353,6 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
                 context.contentResolver.update(uri, contentDetails, null, null)
                 uri
             } else {
-                deleteUri(context, fileName, relPath)
                 Log.i(TAG, "saveVideoQAndAbove: contentUri insert")
                 contentDetails.apply {
                     put(MediaStore.Video.Media.DISPLAY_NAME, fileName)
@@ -357,6 +379,9 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
             }
         }
 
+        /**
+         * save file to publick storage for android 9 and lower
+         */
         private fun copyVideoBelowQ(context: Context,
                                     fileToCopy: File,
                                     uri: Uri?,
@@ -393,6 +418,7 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
             return null
         }
 
+        // relative path to temporary dir
         private val TEMPORARY_DIR_Q = Environment.DIRECTORY_MOVIES + File.separator +
                 "Find Anime" + File.separator +
                 "temporary" + File.separator

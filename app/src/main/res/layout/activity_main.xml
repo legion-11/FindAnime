@@ -23,35 +23,6 @@
         app:menu="@menu/activity_main_drawer"
         app:headerLayout="@layout/nav_header_main" >
 
-<!--        <LinearLayout-->
-<!--            android:layout_marginTop="@dimen/nav_header_height"-->
-<!--            android:layout_width="match_parent"-->
-<!--            android:layout_height="wrap_content"-->
-<!--            android:orientation="vertical">-->
-
-<!--            <LinearLayout-->
-<!--                android:layout_width="match_parent"-->
-<!--                android:layout_height="match_parent">-->
-
-<!--                <TextView-->
-<!--                    android:id="@+id/textView3"-->
-<!--                    android:layout_width="match_parent"-->
-<!--                    android:layout_height="wrap_content"-->
-<!--                    android:drawableStart="@drawable/ic_baseline_help_24"-->
-<!--                    android:drawablePadding="24dp"-->
-<!--                    android:gravity="start|end"-->
-<!--                    android:padding="8dp"-->
-<!--                    android:paddingStart="24dp"-->
-<!--                    android:text="About" />-->
-<!--            </LinearLayout>-->
-
-<!--            <FrameLayout-->
-<!--                android:id="@+id/settings"-->
-<!--                android:layout_width="match_parent"-->
-<!--                android:layout_height="wrap_content" />-->
-<!--        </LinearLayout>-->
-
-
     </com.google.android.material.navigation.NavigationView>
 
 </androidx.drawerlayout.widget.DrawerLayout>

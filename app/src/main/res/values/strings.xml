@@ -4,14 +4,10 @@
     <string name="action_share">Share</string>
     <string name="action_see">See other</string>
     <!-- Strings used for fragments for navigation -->
-    <string name="first_fragment_label">First Fragment</string>
-    <string name="second_fragment_label">Second Fragment</string>
     <string name="next">Next</string>
     <string name="previous">Previous</string>
     <string name="all_images">All images</string>
 
-    <string name="hello_first_fragment">Hello first fragment</string>
-    <string name="hello_second_fragment">Hello second fragment. Arg: %1$s</string>
     <string name="image_preview_from_gallery">image preview from gallery</string>
     <string name="open_on_my_anime_list">Open on My Anime List</string>
     <string name="delete">Delete</string>
@@ -24,28 +20,51 @@
     <string name="title_activity_main">MainActivity</string>
     <string name="navigation_drawer_open">Open navigation drawer</string>
     <string name="navigation_drawer_close">Close navigation drawer</string>
-    <string name="nav_header_title">Android Studio</string>
-    <string name="nav_header_subtitle">android.studio@android.com</string>
+    <string name="nav_header_title">Find Anime</string>
     <string name="nav_header_desc">Navigation header</string>
+
 
     <string name="menu_home">Home</string>
     <string name="menu_gallery">Gallery</string>
     <string name="menu_slideshow">Slideshow</string>
     <string name="title_activity_settings">SettingsActivity</string>
 
-    <!-- Preference Titles -->
-    <string name="messages_header">Messages</string>
-    <string name="sync_header">Sync</string>
-
-    <!-- Messages Preferences -->
-    <string name="signature_title">Your signature</string>
-    <string name="reply_title">Default reply action</string>
-
-    <!-- Sync Preferences -->
-    <string name="sync_title">Sync email periodically</string>
-    <string name="attachment_title">Download incoming attachments</string>
-    <string name="attachment_summary_on">Automatically download attachments for incoming emails
-    </string>
-    <string name="attachment_summary_off">Only download attachments when manually requested</string>
     <string name="url">Url</string>
+    
+    <string name="similarity">Similarity %1$s</string>
+    <string name="episode_part">Episode: %1$s</string>
+    <string name="time_part"> %1$02d:%2$02d:%3$02d</string>
+    <string name="episode_and_time">%1$s %2$s</string>
+
+    <!--  errors  -->
+    <string name="error_save_image">can not take image from gallery</string>
+    <string name="error_save_video">can not save video to file</string>
+    <string name="error_response_body_empty">response from API is unsuccessful, response body is empty</string>
+    <string name="error_no_response_results">response from API is unsuccessful, no search results obtaines</string>
+    <string name="error_unspecified_error">something went wrong</string>
+    <string name="error_legal_age">all results are 18+</string>
+    <string name="error_save_to_public_storage">can not save video to public storage</string>
+    <string name="error_loading_thumbnail">can not load video thumbnail</string>
+
+    <!--  app_bar_main  -->
+    <string name="main_fab_description">show other action bars</string>
+    <string name="image_fab_description">create new search request with image</string>
+    <string name="url_fab_description">create new search request with url</string>
+    <string name="url_button_description">button for copy data from clipboard or delete input</string>
+    <string name="cut_black_borders">Cut black borders</string>
+    <string name="show_h_content">Show H content \n(By enabling this option you confirm that you are legal age)</string>
+    <string name="mute_video">Mute video</string>
+    <string name="small">Small</string>
+    <string name="medium">Medium</string>
+    <string name="large">Large</string>
+    <string name="video_preview_size">Video preview size</string>
+    <string name="permission_used">READ_EXTERNAL_STORAGE permission for obtaining images from phone storage\n\nINTERNET for sending and obtaining data from server</string>
+    <string name="application_policy">Application policy</string>
+    <string name="app_description">Application for finding anime titles and downloading preview by image</string>
+    <string name="about">About</string>
+    <string name="settings">Settings</string>
+    <string name="check_trace_moe_quota">Check trace.moe Quota</string>
+    <string name="logo_of_the_application">logo of the application</string>
+    <string name="thumbnail_of_the_video">thumbnail of the video</string>
+
 </resources>

@@ -2,15 +2,16 @@
 <resources>
     <!--  drawer_spinner_item  -->
     <color name="theme_color_inverse">@color/white</color>
+    <color name="text_input_icon_color">@color/white</color>
 
     <!--  ic_gallery_in_stroke.xml  -->
     <color name="drawable_gallery_in_stroke_background_gradient_start">@color/purple_500</color>
     <color name="drawable_gallery_in_stroke_background_gradient_end">@color/purple_200</color>
-    <color name="drawable_gallery_in_stroke">@color/gray_for_dark_gallery</color>
+    <color name="drawable_gallery_in_stroke">@color/gray_for_dark_gallery_icon</color>
 
     <!--  fragment_image_drawer_list_dialog.xml  -->
     <color name="drawer_background">@color/dark_background</color>
-    <color name="drawer_toolbar_color">@color/dark_grey_on_dark_background</color>
+    <color name="drawer_toolbar_color">@color/grey_on_dark_background</color>
 
     <color name="colorPrimary">@color/purple_200</color>
 

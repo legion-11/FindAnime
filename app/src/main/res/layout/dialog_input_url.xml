@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:padding="16dp">
@@ -9,17 +8,16 @@
     <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="1dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:endIconMode="clear_text">
+        app:layout_constraintTop_toTopOf="parent">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/dialog_uri_input"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="@string/url" />
+            android:hint="@string/url"
+            android:lines="3" />
     </com.google.android.material.textfield.TextInputLayout>
 
 
@@ -27,7 +25,9 @@
         android:id="@+id/paste_button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="right|center_vertical"
-        android:layout_marginRight="10dp"
-        android:src="@drawable/ic_baseline_content_paste_24" />
+        android:layout_gravity="end|center_vertical"
+        android:layout_marginEnd="8dp"
+        android:src="@drawable/ic_baseline_content_paste_24"
+        app:tint="@color/text_input_icon_color"
+        android:contentDescription="@string/url_button_description" />
 </FrameLayout>

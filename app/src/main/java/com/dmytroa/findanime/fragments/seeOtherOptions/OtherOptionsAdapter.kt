@@ -11,6 +11,10 @@ import com.dmytroa.findanime.dataClasses.roomDBEntity.SearchResult
 import com.dmytroa.findanime.databinding.OtherOptionsItemBinding
 import com.dmytroa.findanime.databinding.SearchItemsBinding
 
+/**
+ * adapter for recycler view in [SeeOtherOptionsFragment]
+ * shows images from [SearchResult] that corresponds to selected SearchItem
+ */
 class OtherOptionsAdapter(
     private var items: Array<SearchResult>,
     private val onItemClickListener: OnItemClickListener,
@@ -55,6 +59,9 @@ class OtherOptionsAdapter(
             root.isSelected = itemData.id == newSelectedResult?.id
         }
 
+        /**
+         * select new viewholder
+         */
         override fun onClick(v: View?) {
             val selectedResult = items[bindingAdapterPosition]
             val oldPosition = items.indexOfFirst { it.id == newSelectedResult?.id }

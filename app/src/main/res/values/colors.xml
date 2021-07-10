@@ -19,13 +19,14 @@
     <color name="yellow_200">#FFE082</color>
     <color name="yellow_700">#FFA000</color>
 
-    <color name="gray_for_dark_gallery">#BCBCBC</color>
+    <color name="gray_for_dark_gallery_icon">#BCBCBC</color>
     <color name="dark_background">#1B1B1B</color>
-    <color name="dark_grey_on_dark_background">#222222</color>
+    <color name="grey_on_dark_background">#222222</color>
     <color name="grey_on_white_background">#F5F5F5</color>
 
     <!--  drawer_spinner_item  -->
     <color name="theme_color_inverse">@color/black</color>
+    <color name="text_input_icon_color">#505050</color>
 
     <!--  ic_gallery_in_stroke.xml  -->
     <color name="drawable_gallery_in_stroke_background_gradient_start">@color/purple_200</color>
@@ -40,5 +41,7 @@
 
     <color name="swipe_to_delete_bg">@color/red_700</color>
     <color name="swipe_to_share_bg">@color/yellow_700</color>
-    <color name="material_card_default_color">#FFFFFF</color>
+    <color name="material_card_default_color">@color/white</color>
+
+    <color name="placeholder_color">@color/gray_400</color>
 </resources>

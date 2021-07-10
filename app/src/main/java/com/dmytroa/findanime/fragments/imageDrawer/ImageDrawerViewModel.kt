@@ -4,27 +4,29 @@ import androidx.lifecycle.*
 import com.dmytroa.findanime.dataClasses.Album
 import com.dmytroa.findanime.fragments.imageDrawer.ImageDrawerListDialogFragment.Companion.GALLERY_TYPE
 
+/**
+ * viewModel for [com.dmytroa.findanime.fragments.imageDrawer.ImageDrawerListDialogFragment]
+ * @param albums list of all albums from public storage
+ *               **See** [com.dmytroa.findanime.repositories.LocalFilesRepository.getAlbums]
+ * @param allImagesStringLocalized name for album with all images
+ */
 class ImageDrawerViewModel(private val albums: ArrayList<Album>,
                            allImagesStringLocalized: String) : ViewModel() {
 
-    val albumNames = listOf(allImagesStringLocalized) + albums.sortedByDescending { it.imageIds.maxOrNull() }.map { it.name }
+    // all album names (first name is special name for all images)
+    val albumNames = listOf(allImagesStringLocalized) +
+            albums.sortedByDescending { it.imageIds.maxOrNull() } // the later photo was taken, the earlier album will be in the list
+                .map { it.name }
+
     private val _selectedGallery = MutableLiveData(allImagesStringLocalized)
 
     val images: LiveData<ArrayList<Long>> = Transformations.map(_selectedGallery) { str ->
-        var selectedImages: ArrayList<Long> = arrayListOf()
         if (str == allImagesStringLocalized) {
             //sorted - so images will be in  order it was taken (not album after album)
-            selectedImages =
-                ArrayList( listOf((GALLERY_TYPE).toLong()) + albums.flatMap { it.imageIds }.sorted().reversed())
+            ArrayList( listOf((GALLERY_TYPE).toLong()) + albums.flatMap { it.imageIds }.sorted().reversed())
         } else {
-            for (album in albums) {
-                if (album.name == str) {
-                    selectedImages = album.imageIds
-                    break
-                }
-            }
+            albums.first { it.name == str }.imageIds
         }
-        selectedImages
     }
 
     fun selectGallery(position: Int) {

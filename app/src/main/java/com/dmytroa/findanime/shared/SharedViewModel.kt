@@ -5,6 +5,9 @@ import com.dmytroa.findanime.dataClasses.roomDBEntity.SearchItem
 import com.dmytroa.findanime.dataClasses.roomDBEntity.SearchItemWithSelectedResult
 import com.dmytroa.findanime.dataClasses.roomDBEntity.SearchResult
 
+/**
+ * view model for sharing items between fragments and activity
+ */
 class SharedViewModel : ViewModel() {
     val selectedItemId: MutableLiveData<Long?> = MutableLiveData()
     var newSelectedResult: SearchResult? = null

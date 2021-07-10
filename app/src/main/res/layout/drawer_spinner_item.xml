@@ -6,8 +6,8 @@
     android:gravity="start|center_vertical"
     android:maxLines="1"
     android:ellipsize="end"
-    android:paddingStart="8dp"
-    android:paddingEnd="8dp"
+    android:paddingStart="@dimen/small_margin"
+    android:paddingEnd="@dimen/small_margin"
     android:textColor="@color/theme_color_inverse"
     android:textSize="18sp"
     tools:text="Text text">

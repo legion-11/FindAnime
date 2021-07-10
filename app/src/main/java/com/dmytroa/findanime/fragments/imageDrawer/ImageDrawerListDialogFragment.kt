@@ -33,12 +33,8 @@ import java.util.*
 
 /**
  *
- * A fragment that shows a list of items as a modal bottom sheet.
+ * A fragment that shows a list of images from public storage as a modal bottom sheet.
  *
- * You can show this modal bottom sheet from your activity like this:
- * <pre>
- *    ImageDrawerListDialogFragment.newInstance().show(supportFragmentManager, "dialog")
- * </pre>
  */
 class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
     AdapterView.OnItemSelectedListener {
@@ -49,10 +45,13 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
     private lateinit var viewModel: ImageDrawerViewModel
     private lateinit var listener: OnImageClickListener
 
+    //current ids from selected album
     private var imagesIds: ArrayList<Long> = arrayListOf()
     private val uriExternal = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
 
     private lateinit var behavior: BottomSheetBehavior<View>
+
+    // gradually show toolbar when sliding up
     private val slidingListener = object : BottomSheetBehavior.BottomSheetCallback() {
         override fun onStateChanged(bottomSheet: View, newState: Int) {}
 
@@ -104,7 +103,6 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
         resizableViewMinHeight = resources.getDimension(R.dimen.resizable_view_min_height).toInt()
 
         binding.toolbar.setNavigationIcon(R.drawable.abc_ic_ab_back_material)
-
         binding.toolbar.setNavigationOnClickListener { dismiss() }
 
         val itemsInRow =  if (resources.getBoolean(R.bool.isTablet)) 5 else 3
@@ -131,6 +129,7 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
         viewModel = ViewModelProvider(this, factory).get(ImageDrawerViewModel::class.java)
     }
 
+    // custom spinner styling
     private fun setupSpinner(){
         val spinnerAdapter = ArrayAdapter(requireContext(),
             R.layout.drawer_spinner_item, viewModel.albumNames)
@@ -142,11 +141,14 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
     override fun onStart() {
         super.onStart()
         val bottomSheet = dialog!!.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
+
         // BottomSheetDialogFragment won't shrink after recyclerView shrinks
+        // when you change to album that has small number of images
         bottomSheet.layoutParams.height = ViewGroup.LayoutParams.MATCH_PARENT
         behavior = BottomSheetBehavior.from(bottomSheet as View)
         behavior.peekHeight = (Resources.getSystem().displayMetrics.heightPixels * 0.8).toInt()
 
+        // change starting height when you change orientation on tablets
         if (resources.getBoolean(R.bool.isTablet)) {
             // you can go more fancy and vary the bottom sheet width depending on the screen width
             // see recommendations on https://material.io/components/sheets-bottom#specs
@@ -159,7 +161,6 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
             binding.toolbar.visibility = View.VISIBLE
         }
 
-
         behavior.addBottomSheetCallback(slidingListener)
     }
 
@@ -171,6 +172,10 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
         }
     }
 
+    /**
+     * depending on how much you opened drawer, it will
+     * starts increasing height on last 10%
+     */
     private fun getNewResizableCurtainHeight(slideOffset: Float): Int {
         if (slideOffset <= 0.9) return resizableViewMinHeight!!
         val newHeight = ((slideOffset - 0.9f) * 10f * binding.toolbar.height).toInt()
@@ -185,7 +190,6 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
     }
 
     companion object {
-//        const val ARG_ITEMS_IN_ROW = "items_in_row"
         fun newInstance() = ImageDrawerListDialogFragment()
         const val GALLERY_TYPE = -1
         const val IMAGE_TYPE = 0
@@ -195,6 +199,8 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+
+        // take image with photo picker intent
         if (requestCode == RESULT_LOAD_IMG && resultCode == RESULT_OK) {
             val imageUri = data?.data
             if (imageUri != null) {
@@ -259,10 +265,15 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
         }
     }
 
-    /** baseViewHolder for ImageDrawerItemAdapter */
+    /**
+     * baseViewHolder for ImageDrawerItemAdapter
+     */
     private abstract inner class BaseViewHolder(binding: ViewBinding): RecyclerView.ViewHolder(binding.root)
 
-    /** viewHolder for ImageDrawerItemAdapter */
+    /**
+     * viewHolder for ImageDrawerItemAdapter
+     *  represent the clickable image that allows select images from gallery app
+     */
     private inner class GalleryViewHolder(binding: FragmentImageDrawerListDialogItemBinding):
         BaseViewHolder(binding), View.OnClickListener {
 
@@ -276,7 +287,10 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
         }
     }
 
-    /** viewHolder for Images from gallery */
+    /**
+     * viewHolder for Images from gallery
+     * represent single image from public storage
+     */
     private inner class ImageViewHolder(binding: FragmentImageDrawerListDialogItemBinding):
         BaseViewHolder(binding), View.OnClickListener {
 
@@ -314,6 +328,7 @@ class ImageDrawerListDialogFragment : BottomSheetDialogFragment(),
         fun onDrawerImageClick(imageUri: Uri)
     }
 
+    // change album
     override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
         viewModel.selectGallery(position)
     }

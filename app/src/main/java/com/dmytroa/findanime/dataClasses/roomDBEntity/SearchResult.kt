@@ -5,6 +5,11 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.PrimaryKey
 
+/**
+ * Room DB entity for response from https://api.trace.moe/search
+ * fields corresponds to [com.dmytroa.findanime.dataClasses.retrofit.Result]
+ * except fields are flattened
+ */
 @Entity(
     foreignKeys = [ForeignKey(
         entity = SearchItem::class,
