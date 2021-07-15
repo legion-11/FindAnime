@@ -9,7 +9,7 @@ android {
     buildToolsVersion "30.0.2"
 
     defaultConfig {
-        applicationId "com.dmytroa.findanime"
+        applicationId "com.legion_11.findanime"
         minSdkVersion 21
         targetSdkVersion 30
         versionCode 1
