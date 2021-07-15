@@ -2,14 +2,12 @@ package com.dmytroa.findanime
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.*
 import android.content.ClipDescription.MIMETYPE_TEXT_PLAIN
-import android.content.ClipboardManager
-import android.content.Context
-import android.content.DialogInterface
-import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
+import android.os.Parcelable
 import android.text.Editable
 import android.text.TextWatcher
 import android.util.Log
@@ -118,18 +116,49 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
                 return true
             }
         })
-        if (defaultSharedPreferences.getBoolean("show_files_in_gallery", false)) {
-            LocalFilesRepository.deleteNoMediaFile(this)
-        } else {
-            LocalFilesRepository.createNoMediaFile(this)
-        }
+//        if (defaultSharedPreferences.getBoolean("show_files_in_gallery", false)) {
+//            LocalFilesRepository.deleteNoMediaFile(this)
+//        } else {
+//            LocalFilesRepository.createNoMediaFile(this)
+//        }
+//        LocalFilesRepository.createNoMediaFile(this)
 
         clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     }
 
+    override fun onStart() {
+        super.onStart()
+        when (intent?.action) {
+            Intent.ACTION_SEND -> {
+                if ("text/plain" == intent.type) {
+                    handleSendText(intent) // Handle text being sent
+                } else if (intent.type?.startsWith("image/") == true) {
+                    handleSendImage(intent) // Handle single image being sent
+                }
+            }
+            else -> {
+                // Handle other intents, such as being started from the home screen
+            }
+        }
+        intent?.action = null
+    }
+
+    private fun handleSendText(intent: Intent) {
+        intent.getStringExtra(Intent.EXTRA_TEXT)?.let {
+            buildUrlInputDialog(it)
+        }
+    }
+
+    private fun handleSendImage(intent: Intent) {
+        Log.i(TAG, "handleSendImage: ")
+        (intent.getParcelableExtra<Parcelable>(Intent.EXTRA_STREAM) as? Uri)?.let {
+            submitRequest(it)
+        }
+    }
+
 
     @SuppressLint("InflateParams")
-    private fun buildUrlInputDialog(){
+    private fun buildUrlInputDialog(text: String? = null){
 
         fun getTextFromClipBoard(): String {
             if (!clipboard.hasPrimaryClip()) return ""
@@ -161,7 +190,8 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
         val layout = layoutInflater.inflate(R.layout.dialog_input_url, null)
         val textInput = layout.findViewById<TextInputEditText>(R.id.dialog_uri_input)
         val pasteButton = layout.findViewById<ImageButton>(R.id.paste_button)
-        textInput.setText(getTextFromClipBoard())
+        textInput.setText( text ?: getTextFromClipBoard())
+
         changeImage(pasteButton, textInput)
         pasteButton.setOnClickListener {
             if (isEmpty(textInput)) {
@@ -234,20 +264,19 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
     }
 
     private fun submitRequest(imageUri: Uri) {
+        Log.i(TAG, "submitRequest: ${supportFragmentManager.currentNavigationFragment}")
         supportFragmentManager.currentNavigationFragment?.let {fragment ->
-            if (fragment is Interfaces.SubmitSearchRequest) {
-                (fragment as Interfaces.SubmitSearchRequest)
-                    .createRequest(Interfaces.SearchOption.MyUri(imageUri))
-            }
+            Log.i(TAG, "submitRequest: $fragment")
+            (fragment as? Interfaces.SubmitSearchRequest)
+                ?.createRequest(Interfaces.SearchOption.MyUri(imageUri))
         }
     }
 
     private fun submitRequest(url: String) {
         supportFragmentManager.currentNavigationFragment?.let {fragment ->
-            if (fragment is Interfaces.SubmitSearchRequest) {
-                (fragment as Interfaces.SubmitSearchRequest)
-                    .createRequest(Interfaces.SearchOption.MyUrl(url))
-            }
+                (fragment as? Interfaces.SubmitSearchRequest)
+                    ?.createRequest(Interfaces.SearchOption.MyUrl(url))
+
         }
     }
 

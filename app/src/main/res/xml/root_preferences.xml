@@ -8,10 +8,10 @@
 <!--            app:title="Use trace.moe API Key"-->
 <!--            app:useSimpleSummaryProvider="true" />-->
 
-        <SwitchPreferenceCompat
-            app:defaultValue="true"
-            app:key="show_files_in_gallery"
-            app:title="Show downloaded videos in gallery" />
+<!--        <SwitchPreferenceCompat-->
+<!--            app:defaultValue="true"-->
+<!--            app:key="show_files_in_gallery"-->
+<!--            app:title="Show downloaded videos in gallery" />-->
 
         <SwitchPreferenceCompat
             app:defaultValue="true"

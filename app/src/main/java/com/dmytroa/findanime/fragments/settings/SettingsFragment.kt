@@ -48,17 +48,17 @@ class SettingsFragment : PreferenceFragmentCompat() {
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         setPreferencesFromResource(R.xml.root_preferences, rootKey)
 
-        val showInGalleryPreference: SwitchPreferenceCompat? =
-            preferenceManager.findPreference("show_files_in_gallery")
-        showInGalleryPreference?.setOnPreferenceChangeListener { sharedPreferences, newValue ->
-            newValue as Boolean
-            if (newValue) {
-                LocalFilesRepository.deleteNoMediaFile(requireContext())
-            } else {
-                LocalFilesRepository.createNoMediaFile(requireContext())
-            }
-            true
-        }
+//        val showInGalleryPreference: SwitchPreferenceCompat? =
+//            preferenceManager.findPreference("show_files_in_gallery")
+//        showInGalleryPreference?.setOnPreferenceChangeListener { sharedPreferences, newValue ->
+//            newValue as Boolean
+//            if (newValue) {
+//                LocalFilesRepository.deleteNoMediaFile(requireContext())
+//            } else {
+//                LocalFilesRepository.createNoMediaFile(requireContext())
+//            }
+//            true
+//        }
 
         val myGithubPreference: Preference? = preferenceManager.findPreference("my_github")
         myGithubPreference?.setOnPreferenceClickListener {

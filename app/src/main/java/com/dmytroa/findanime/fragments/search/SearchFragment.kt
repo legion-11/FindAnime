@@ -306,6 +306,8 @@ class SearchFragment : Fragment(), Interfaces.SubmitSearchRequest,
         })
 
         binding.searchResultRecyclerView.addOnScrollListener(onScrollListener)
+
+
     }
 
     override fun onDestroyView() {
@@ -397,10 +399,10 @@ class SearchFragment : Fragment(), Interfaces.SubmitSearchRequest,
                 when(uriOrUrl) {
                     is Interfaces.SearchOption.MyUrl ->
                         viewModel.createNewAnimeSearchRequest(
-                            uriOrUrl.holding, videoSize, muteVideo, cutBlackBorders, showHContent)
+                            uriOrUrl.url, videoSize, muteVideo, cutBlackBorders, showHContent)
                     is Interfaces.SearchOption.MyUri ->
                         viewModel.createNewAnimeSearchRequest(
-                            uriOrUrl.holding, videoSize, muteVideo, cutBlackBorders, showHContent)
+                            uriOrUrl.uri, videoSize, muteVideo, cutBlackBorders, showHContent)
                 }
                 dialog.dismiss()
             }
@@ -411,6 +413,7 @@ class SearchFragment : Fragment(), Interfaces.SubmitSearchRequest,
      * submit image/url to viewModel so it can enqueue call request to server
      */
     override fun createRequest(uriOrUrl: Interfaces.SearchOption) {
+        Log.i(TAG, "createRequest: ")
         val dontShowDialog = defaultSharedPreferences.getBoolean("do_not_ask_before_search", true)
         if (dontShowDialog) {
             val size = defaultSharedPreferences.getString("video_size", "l")!!
@@ -421,10 +424,10 @@ class SearchFragment : Fragment(), Interfaces.SubmitSearchRequest,
             when(uriOrUrl) {
                 is Interfaces.SearchOption.MyUrl ->
                     viewModel.createNewAnimeSearchRequest(
-                        uriOrUrl.holding, size, muteVideo, cutBlackBorders, showHContent)
+                        uriOrUrl.url, size, muteVideo, cutBlackBorders, showHContent)
                 is Interfaces.SearchOption.MyUri ->
                     viewModel.createNewAnimeSearchRequest(
-                        uriOrUrl.holding, size, muteVideo, cutBlackBorders, showHContent)
+                        uriOrUrl.uri, size, muteVideo, cutBlackBorders, showHContent)
             }
         } else {
             showDialogWithSearchSettings(uriOrUrl)
