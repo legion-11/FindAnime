@@ -227,10 +227,9 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
                 READ_MEDIA_PERMISSION_REQUEST
             )
             return
-        } else {
-            //TODO for now it always asks permission, change to getting from shared properties last answer
-            showImageDrawerListDialogFragment()
         }
+        //TODO for now it always asks permission, change to getting from shared properties last answer
+        showImageDrawerListDialogFragment()
     }
 
     override fun onRequestPermissionsResult(

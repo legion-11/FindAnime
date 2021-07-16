@@ -1,11 +1,13 @@
 package com.legion_11.findanime.fragments.search
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.DialogInterface
 import android.content.Intent
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.graphics.Canvas
 import android.net.Uri
 import android.os.Bundle
@@ -14,6 +16,7 @@ import android.view.*
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.view.ActionMode
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
@@ -453,9 +456,22 @@ class SearchFragment : Fragment(), Interfaces.SubmitSearchRequest,
     private fun shareItemById(id: Long) {
         CoroutineScope(Dispatchers.IO).launch {
             viewModel.getSearchItemById(id).videoFileName?.let {
-                viewModel.share(it, requireContext())
+                requestPermissionForWriting(it)
             }
         }
+    }
+
+    private fun requestPermissionForWriting(fileName: String) {
+        if (ContextCompat.checkSelfPermission(requireContext(),
+                Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+
+            ActivityCompat.requestPermissions(requireActivity(),
+                arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
+                WRITE_MEDIA_PERMISSION_REQUEST
+            )
+            return
+        }
+        viewModel.share(fileName, requireContext())
     }
 
     /**
@@ -531,6 +547,7 @@ class SearchFragment : Fragment(), Interfaces.SubmitSearchRequest,
 
     companion object {
         const val READ_MEDIA_PERMISSION_REQUEST = 100
+        const val WRITE_MEDIA_PERMISSION_REQUEST = 101
         const val UPDATE_PERMISSION_REQUEST = 200
         const val KEY_SAVED_OPTION_VIDEO_SIZE = "key_dialog_video_length"
         const val KEY_SAVED_OPTION_H_CONTENT = "key_dialog_show_h_content"

@@ -374,7 +374,6 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
 
             val fileToCreate = File(dstDir, fileName)
 
-            fileToCreate.delete()
             fileToCreate.createNewFile()
             try {
                 fileToCopy.inputStream().use { input ->
@@ -388,7 +387,9 @@ class LocalFilesRepository(private val searchDao: SearchDao) {
                         put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
                         put(MediaStore.Video.Media.DATA, fileToCreate.path)
                     }
-                    context.contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
+                    val insert = context.contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
+
+                    insert
                 }
             } catch (e: IOException) {
                 e.printStackTrace()

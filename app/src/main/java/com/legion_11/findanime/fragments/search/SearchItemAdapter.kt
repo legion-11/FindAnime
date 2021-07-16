@@ -298,15 +298,15 @@ class SearchItemAdapter(
         /**
          * videoView.setOnPreparedListener not representing the moment once video is fully ready to play
          * so to prevent flickering of black color while video is starting we just hiding thumbnail
-         * once current playback position changes from 0
+         * once current playback position goes to 0.2 seconds
          */
         private fun showVideoViewOnceVideoIsFullyPrepared(mp: MediaPlayer?) {
             CoroutineScope(Dispatchers.IO).launch {
                 var started = false
                 var counter = 0
-                while (!started || counter < 100) {
+                while (!started || counter < 200) {
                     try {
-                        if (mp != null && mp.currentPosition > 0) {
+                        if (mp != null && mp.currentPosition > 200) {
                             break
                         }
                         delay(10)
@@ -353,7 +353,7 @@ class SearchItemAdapter(
         }
 
         /**
-         * instead of loading cideo we just loading thumbnail,
+         * instead of loading video we just loading thumbnail,
          * and loading video only when user clicks on it
          */
         private fun loadVideo(item: SearchItem) {
@@ -401,8 +401,8 @@ class SearchItemAdapter(
 
             thumbnailImageView.setOnLongClickListener(this@ViewHolder)
             thumbnailImageView.setOnClickListener(this@ViewHolder)
-            videoView.setOnClickListener(this@ViewHolder)
-            videoView.setOnLongClickListener(this@ViewHolder)
+            videoContainer.setOnClickListener(this@ViewHolder)
+            videoContainer.setOnLongClickListener(this@ViewHolder)
 
         }
 
@@ -471,7 +471,7 @@ class SearchItemAdapter(
                         }
                     }
                 }
-                videoView -> {
+                videoContainer -> {
                     if (videoView.isPlaying) { videoView.pause() }
                     else { videoView.start() }
                 }
@@ -492,7 +492,7 @@ class SearchItemAdapter(
                     root.isPressed = false
                     true
                 }
-                videoView -> {
+                videoContainer -> {
                     root.performClick()
                     root.isPressed = true
                     root.isPressed = false
