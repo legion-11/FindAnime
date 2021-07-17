@@ -139,7 +139,6 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
                 val newItem = SearchItem(null, imageCopyName, size, mute, cutBlackBorders, showHContent)
                 val newId = insert(newItem)
                 newItem.id = newId
-                //<--- stop 1
                 searchByImage(imageCopyName, newItem)
             } else {
                 errorMessages.value = gallerySaveError

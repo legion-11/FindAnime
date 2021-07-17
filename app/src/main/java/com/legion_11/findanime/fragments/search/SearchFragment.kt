@@ -321,7 +321,7 @@ class SearchFragment : Fragment(), Interfaces.SubmitSearchRequest,
 
     override fun onPause() {
         // by doing so we can stop all mediaPlayers that were running at the moment
-        searchAdapter?.notifyDataSetChanged()
+        stopVideo()
         super.onPause()
     }
 
@@ -422,6 +422,10 @@ class SearchFragment : Fragment(), Interfaces.SubmitSearchRequest,
         } else {
             showDialogWithSearchSettings(uriOrUrl)
         }
+    }
+
+    override fun stopVideo() {
+        searchAdapter?.notifyDataSetChanged()
     }
 
     override fun openMal(idMal: Int) {

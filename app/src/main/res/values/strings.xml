@@ -58,7 +58,10 @@
     <string name="medium">Medium</string>
     <string name="large">Large</string>
     <string name="video_preview_size">Video preview size</string>
-    <string name="permission_used">READ_EXTERNAL_STORAGE permission for obtaining images from phone storage\n\nINTERNET for sending and obtaining data from server</string>
+    <string name="permission_used">Application uses:\n\n
+        WRITE_EXTERNAL_STORAGE permission for obtaining images from phone gallery,
+        and temporarily saving video in gallery before sharing
+        \n\nINTERNET permission for sending and obtaining data from server</string>
     <string name="application_policy">Application policy</string>
     <string name="app_description">Application for finding anime titles and downloading preview by image</string>
     <string name="about">About</string>

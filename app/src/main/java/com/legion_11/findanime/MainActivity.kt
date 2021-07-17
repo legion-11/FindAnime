@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.os.Parcelable
 import android.text.Editable
 import android.text.TextWatcher
+import android.util.Log
 import android.util.Patterns
 import android.view.MenuItem
 import android.view.MotionEvent
@@ -32,6 +33,9 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
 import androidx.navigation.findNavController
 import androidx.preference.PreferenceManager
+import com.google.android.gms.ads.*
+import com.google.android.gms.ads.interstitial.InterstitialAd
+import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.legion_11.findanime.dataClasses.retrofit.Quota
 import com.legion_11.findanime.fragments.SharedInterfaces
 import com.legion_11.findanime.fragments.imageDrawer.ImageDrawerListDialogFragment
@@ -75,6 +79,10 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
     private lateinit var defaultSharedPreferences: SharedPreferences
 
     private val sharedViewModel: SharedViewModel by viewModels()
+
+    private var mInterstitialAd: InterstitialAd? = null
+    private var mAdIsLoading: Boolean = false
+    private lateinit var googleAdsKey: String
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -121,6 +129,10 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
 //        LocalFilesRepository.createNoMediaFile(this)
 
         clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        googleAdsKey = getString(R.string.while_search_ad_unit_key)
+        MobileAds.initialize(this) {}
+
+        loadAd()
     }
 
     override fun onStart() {
@@ -262,14 +274,66 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
         supportFragmentManager.currentNavigationFragment?.let {fragment ->
             (fragment as? Interfaces.SubmitSearchRequest)
                 ?.createRequest(Interfaces.SearchOption.MyUri(imageUri))
+                ?.run {showInterstitial()}
         }
     }
 
     private fun submitRequest(url: String) {
         supportFragmentManager.currentNavigationFragment?.let {fragment ->
-                (fragment as? Interfaces.SubmitSearchRequest)
-                    ?.createRequest(Interfaces.SearchOption.MyUrl(url))
+            (fragment as? Interfaces.SubmitSearchRequest)
+                ?.createRequest(Interfaces.SearchOption.MyUrl(url))
+                ?.run {showInterstitial()}
+        }
+    }
 
+    private fun loadAd() {
+        val adRequest = AdRequest.Builder().build()
+        mAdIsLoading = true
+        InterstitialAd.load(this, googleAdsKey, adRequest,
+            object : InterstitialAdLoadCallback() {
+                override fun onAdFailedToLoad(adError: LoadAdError) {
+                    Log.i(TAG, "onAdFailedToLoad: ")
+                    mInterstitialAd = null
+                    mAdIsLoading = false
+                }
+
+                override fun onAdLoaded(interstitialAd: InterstitialAd) {
+                    Log.i(TAG, "onAdLoaded: ")
+                    mInterstitialAd = interstitialAd
+                    mAdIsLoading = false
+                }
+            })
+    }
+
+    private fun showInterstitial() {
+        Log.i(TAG, "showInterstitial: ")
+        if (mInterstitialAd != null) {
+            mInterstitialAd?.fullScreenContentCallback = object : FullScreenContentCallback() {
+                override fun onAdDismissedFullScreenContent() {
+                    Log.i(TAG, "onAdDismissedFullScreenContent: ")
+                    mInterstitialAd = null
+                    loadAd()
+                }
+
+                override fun onAdFailedToShowFullScreenContent(adError: AdError?) {
+                    Log.i(TAG, "onAdFailedToShowFullScreenContent: ")
+                    mInterstitialAd = null
+                    loadAd()
+                }
+
+                override fun onAdShowedFullScreenContent() {
+                    supportFragmentManager.currentNavigationFragment?.let {fragment ->
+                        (fragment as? Interfaces.SubmitSearchRequest)?.stopVideo()
+                    }
+                }
+            }
+            // todo do not show that frequently
+            mInterstitialAd?.show(this)
+            return
+        }
+        if (!mAdIsLoading) {
+            Log.i(TAG, "showInterstitial: load called")
+            loadAd()
         }
     }
 

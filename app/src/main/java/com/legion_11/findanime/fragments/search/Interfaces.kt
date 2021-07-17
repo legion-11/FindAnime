@@ -9,6 +9,7 @@ object Interfaces {
      */
     interface SubmitSearchRequest {
         fun createRequest(uriOrUrl: SearchOption)
+        fun stopVideo()
     }
 
     /**
