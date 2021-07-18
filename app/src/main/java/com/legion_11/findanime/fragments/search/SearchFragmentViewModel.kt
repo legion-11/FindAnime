@@ -341,7 +341,10 @@ class SearchFragmentViewModel(application: Application) : AndroidViewModel(appli
             semaphoreVideoCall.acquire()
             cancelCall(searchItemId)
             val searchItemToUpdate = repository.getSearchItemById(searchItemId)
-
+            if (newSearchResult.id == searchItemToUpdate.selectedResultId) {
+                semaphoreVideoCall.release()
+                return@launch
+            }
             searchItemToUpdate.videoFileName?.let { LocalFilesRepository.deleteVideo(it, getApplication()) }
             searchItemToUpdate.selectedResultId = newSearchResult.id
             searchItemToUpdate.videoFileName = null

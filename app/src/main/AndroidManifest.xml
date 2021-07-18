@@ -3,7 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     package="com.legion_11.findanime"
     android:versionCode="1"
-    android:versionName="1.0" >
+    android:versionName="1.0.0" >
 
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />
