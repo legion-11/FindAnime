@@ -19,7 +19,6 @@ import android.view.animation.Animation
 import android.view.animation.AnimationUtils
 import android.view.inputmethod.InputMethodManager
 import android.webkit.URLUtil
-import android.widget.ImageButton
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -49,6 +48,7 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.navigation.NavigationView
 import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
@@ -179,11 +179,11 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
             return  textInput.text.toString().matches(Regex(""))
         }
 
-        fun changeImage(button: ImageButton, textInput: TextInputEditText) {
+        fun changeImage(textInputLayout: TextInputLayout, textInput: TextInputEditText) {
             if (isEmpty(textInput)) {
-                button.setImageResource(R.drawable.ic_baseline_content_paste_24)
+                textInputLayout.setEndIconDrawable(R.drawable.ic_baseline_content_paste_24)
             } else {
-                button.setImageResource(R.drawable.ic_baseline_close_24)
+                textInputLayout.setEndIconDrawable(R.drawable.ic_baseline_close_24)
             }
         }
 
@@ -197,17 +197,18 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
 
         val layout = layoutInflater.inflate(R.layout.dialog_input_url, null)
         val textInput = layout.findViewById<TextInputEditText>(R.id.dialog_uri_input)
-        val pasteButton = layout.findViewById<ImageButton>(R.id.paste_button)
+        val textInputLayout = layout.findViewById<TextInputLayout>(R.id.dialog_uri_input_layout)
+
         textInput.setText( text ?: getTextFromClipBoard())
 
-        changeImage(pasteButton, textInput)
-        pasteButton.setOnClickListener {
+        changeImage(textInputLayout, textInput)
+        textInputLayout.setEndIconOnClickListener {
             if (isEmpty(textInput)) {
                 textInput.setText(getTextFromClipBoard())
             } else {
                 textInput.setText("")
             }
-            changeImage(pasteButton, textInput)
+            changeImage(textInputLayout, textInput)
         }
 
         val dialog = AlertDialog.Builder(this)
@@ -228,7 +229,7 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
 
             override fun afterTextChanged(s: Editable?) {
                 posButton.isEnabled = isValidUrl(s.toString())
-                changeImage(pasteButton, textInput)
+                changeImage(textInputLayout, textInput)
             }
         })
     }
@@ -404,7 +405,7 @@ class MainActivity : AppCompatActivity(), ImageDrawerListDialogFragment.OnImageC
     }
 
     override fun showSnackBar(message: String) {
-        Snackbar.make(fabMain, message, Snackbar.LENGTH_LONG).show()
+        Snackbar.make(fabMain, message, Snackbar.LENGTH_INDEFINITE).show()
     }
 
     override fun setupFab(fabIconRes: Int, function: () -> Unit) {
